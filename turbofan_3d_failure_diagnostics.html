@@ -1,0 +1,3875 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Two-Spool Turbofan Failure Diagnostics</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: #e5edf6;
+      background: #070b12;
+    }
+
+    #viewport {
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(circle at 50% 40%, rgba(31, 60, 90, 0.28), transparent 46%),
+        linear-gradient(180deg, #0b111d 0%, #05070b 100%);
+    }
+
+    .panel {
+      position: fixed;
+      z-index: 4;
+      background: rgba(11, 18, 30, 0.84);
+      border: 1px solid rgba(122, 145, 172, 0.22);
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.48);
+      backdrop-filter: blur(14px);
+      border-radius: 8px;
+      padding: 14px;
+    }
+
+    .left-panel {
+      left: 18px;
+      top: 18px;
+      width: 280px;
+      max-height: calc(100vh - 36px);
+      overflow-y: auto;
+    }
+
+    .right-panel {
+      right: 18px;
+      top: 18px;
+      width: 310px;
+    }
+
+    .bottom-strip {
+      left: 50%;
+      bottom: 18px;
+      width: min(760px, calc(100vw - 36px));
+      transform: translateX(-50%);
+      padding: 12px 14px;
+    }
+
+    h1 {
+      font-size: 15px;
+      line-height: 1.25;
+      margin-bottom: 4px;
+      letter-spacing: 0.2px;
+      font-weight: 650;
+    }
+
+    h2 {
+      margin-bottom: 10px;
+      color: #7dd3fc;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.7px;
+      text-transform: uppercase;
+    }
+
+    .subtle {
+      color: #a6b5c6;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .mode-grid {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .control-block {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(122, 145, 172, 0.18);
+    }
+
+    .control-row {
+      display: grid;
+      grid-template-columns: 78px 1fr 58px;
+      gap: 7px;
+      align-items: center;
+      margin-bottom: 8px;
+      color: #cbd8e6;
+      font-size: 11px;
+    }
+
+    .control-row.full {
+      grid-template-columns: 1fr;
+    }
+
+    .module-control {
+      margin-top: 11px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(122, 145, 172, 0.14);
+    }
+
+    .module-header,
+    .stage-row {
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+      gap: 6px;
+      align-items: center;
+      margin-bottom: 6px;
+      color: #cbd8e6;
+      font-size: 10px;
+    }
+
+    .module-header {
+      grid-template-columns: 42px minmax(0, 1fr) 34px 64px;
+    }
+
+    .stage-row.header {
+      color: #93a7bc;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .module-header input,
+    .module-header select,
+    .stage-row input {
+      width: 100%;
+      min-height: 26px;
+      color: #e5edf6;
+      background: rgba(27, 39, 56, 0.9);
+      border: 1px solid rgba(126, 148, 171, 0.28);
+      border-radius: 5px;
+      padding: 3px 5px;
+      font: inherit;
+      font-size: 10px;
+    }
+
+    .module-header input[type="color"] {
+      min-height: 28px;
+      padding: 2px;
+    }
+
+    .control-row input,
+    .control-row select {
+      width: 100%;
+      min-height: 28px;
+      color: #e5edf6;
+      background: rgba(27, 39, 56, 0.9);
+      border: 1px solid rgba(126, 148, 171, 0.28);
+      border-radius: 5px;
+      padding: 3px 6px;
+      font: inherit;
+      font-size: 11px;
+    }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+      color: #cbd8e6;
+      font-size: 11px;
+    }
+
+    .check-row input {
+      width: 14px;
+      height: 14px;
+      accent-color: #38bdf8;
+    }
+
+    .visibility-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2px 10px;
+      margin-top: 8px;
+    }
+
+    .visibility-grid .check-row {
+      margin: 4px 0;
+    }
+
+    .section-subtitle {
+      margin-top: 12px;
+      margin-bottom: 6px;
+      color: #9fb8d2;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.45px;
+      text-transform: uppercase;
+    }
+
+    .view-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .view-button.active {
+      color: #06121d;
+      background: #7dd3fc;
+      border-color: #bae6fd;
+    }
+
+    .view-state {
+      display: grid;
+      gap: 5px;
+      margin-top: 8px;
+      padding: 8px;
+      color: #cbd8e6;
+      background: rgba(7, 13, 22, 0.45);
+      border: 1px solid rgba(122, 145, 172, 0.18);
+      border-radius: 6px;
+      font: 10px/1.35 Consolas, "Liberation Mono", monospace;
+    }
+
+    .view-state-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .view-state-row span:first-child {
+      color: #93a7bc;
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-weight: 700;
+    }
+
+    .view-state-row span:last-child {
+      text-align: right;
+      word-break: break-word;
+    }
+
+    .view-state-row.wide {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 3px;
+    }
+
+    .view-state-row.wide span:last-child {
+      text-align: left;
+    }
+
+    .action-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .small-button {
+      min-height: 30px;
+      color: #dbeafe;
+      background: rgba(30, 58, 95, 0.78);
+      border: 1px solid rgba(125, 211, 252, 0.3);
+      border-radius: 6px;
+      cursor: pointer;
+      font: inherit;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .small-button:hover {
+      background: rgba(37, 99, 155, 0.8);
+    }
+
+    .preset-note {
+      margin-top: 8px;
+      min-height: 14px;
+      color: #93c5fd;
+      font-size: 10px;
+      line-height: 1.35;
+    }
+
+    .mode-button {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      min-height: 36px;
+      padding: 8px 10px;
+      color: #c8d6e5;
+      background: rgba(27, 39, 56, 0.86);
+      border: 1px solid rgba(126, 148, 171, 0.24);
+      border-radius: 6px;
+      cursor: pointer;
+      font: inherit;
+      font-size: 12px;
+      text-align: left;
+    }
+
+    .mode-button:hover {
+      background: rgba(43, 61, 84, 0.92);
+    }
+
+    .mode-button.active {
+      color: #fff7ed;
+      background: rgba(127, 29, 29, 0.88);
+      border-color: #fb7185;
+    }
+
+    .mode-button.nominal.active {
+      color: #dcfce7;
+      background: rgba(6, 95, 70, 0.86);
+      border-color: #34d399;
+    }
+
+    .badge {
+      flex: 0 0 auto;
+      margin-left: 10px;
+      padding: 2px 6px;
+      color: #dbeafe;
+      background: rgba(59, 130, 246, 0.2);
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+
+    .data-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 7px 0;
+      border-bottom: 1px solid rgba(122, 145, 172, 0.17);
+      font-size: 12px;
+    }
+
+    .data-row span:first-child {
+      color: #9fb0c2;
+    }
+
+    .data-row span:last-child {
+      color: #eef6ff;
+      font-family: Consolas, "Liberation Mono", monospace;
+      font-weight: 700;
+      text-align: right;
+    }
+
+    #status {
+      margin-top: 12px;
+      padding: 10px;
+      border-left: 4px solid #34d399;
+      border-radius: 6px;
+      background: rgba(16, 185, 129, 0.11);
+    }
+
+    #status-title {
+      display: block;
+      color: #34d399;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.35px;
+      margin-bottom: 4px;
+    }
+
+    #status-desc {
+      color: #c5d1df;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+      color: #cbd8e6;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      border: 1px solid rgba(255, 255, 255, 0.24);
+      flex: 0 0 auto;
+    }
+
+    .hint {
+      position: fixed;
+      left: 18px;
+      bottom: 18px;
+      z-index: 3;
+      color: rgba(226, 232, 240, 0.7);
+      font-size: 11px;
+      pointer-events: none;
+    }
+
+    @media (max-width: 860px) {
+      body {
+        overflow-y: auto;
+        background: #070b12;
+      }
+
+      #viewport {
+        position: relative;
+        height: 52vh;
+        min-height: 390px;
+      }
+
+      .panel {
+        position: relative;
+        inset: auto;
+        width: auto;
+        margin: 12px;
+        transform: none;
+      }
+
+      .legend {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .hint {
+        display: none;
+      }
+    }
+
+    body.embed .panel,
+    body.embed .hint {
+      display: none;
+    }
+
+    body.embed #viewport {
+      position: fixed;
+      inset: 0;
+    }
+  </style>
+</head>
+
+<body>
+  <script>
+    (() => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("embed") === "1" || params.get("embed") === "true") {
+        document.body.classList.add("embed");
+      }
+    })();
+  </script>
+  <main id="viewport" aria-label="Interactive 3D two-spool turbofan model"></main>
+
+  <section class="panel left-panel">
+    <h1>Representative Two-Spool Turbofan</h1>
+    <p class="subtle">Translucent cutaway with N1 and N2 rotor paths. Select a failure mode to highlight affected
+      submodules.</p>
+    <div class="mode-grid" id="mode-grid"></div>
+    <div class="control-block">
+      <h2>Rotor Preset</h2>
+      <div class="control-row">
+        <label for="speed-control">Speed</label>
+        <input id="speed-control" type="range" min="0.2" max="3" step="0.1">
+        <span id="speed-value">1.0x</span>
+      </div>
+      <label class="check-row">
+        <input id="stats-toggle" type="checkbox" checked>
+        <span>Show right stats panel</span>
+      </label>
+      <div id="rotor-controls"></div>
+      <div class="action-row">
+        <button class="small-button" id="save-preset" type="button">Save Default</button>
+        <button class="small-button" id="reset-preset" type="button">Reset</button>
+      </div>
+      <p class="preset-note" id="preset-note"></p>
+    </div>
+    <div class="control-block">
+      <h2>Scene Controls</h2>
+      <label class="check-row">
+        <input id="spin-toggle" type="checkbox">
+        <span>Stop spinning</span>
+      </label>
+      <label class="check-row">
+        <input id="half-section-toggle" type="checkbox">
+        <span>Show half cross-section</span>
+      </label>
+      <div class="section-subtitle">Module Visibility</div>
+      <div class="visibility-grid" id="module-visibility-list"></div>
+      <div class="section-subtitle">Flow Controls</div>
+      <div class="control-row">
+        <label for="streamline-opacity-control">Streamlines</label>
+        <input id="streamline-opacity-control" data-flow-opacity="streamline" type="range" min="0" max="1" step="0.01">
+        <span id="streamline-opacity-value">10%</span>
+      </div>
+      <div class="control-row">
+        <label for="core-flow-opacity-control">Core flow</label>
+        <input id="core-flow-opacity-control" data-flow-opacity="core" type="range" min="0" max="1" step="0.01">
+        <span id="core-flow-opacity-value">60%</span>
+      </div>
+      <div class="control-row">
+        <label for="bypass-flow-opacity-control">Bypass flow</label>
+        <input id="bypass-flow-opacity-control" data-flow-opacity="bypass" type="range" min="0" max="1" step="0.01">
+        <span id="bypass-flow-opacity-value">10%</span>
+      </div>
+      <div class="section-subtitle">Orthogonal Views</div>
+      <div class="view-grid" id="view-controls"></div>
+      <div class="section-subtitle">Current View</div>
+      <div class="view-state" id="view-state">
+        <div class="view-state-row"><span>Camera</span><span id="view-camera">-</span></div>
+        <div class="view-state-row"><span>Target</span><span id="view-target">-</span></div>
+        <div class="view-state-row"><span>Up</span><span id="view-up">-</span></div>
+        <div class="view-state-row"><span>Viewport</span><span id="view-viewport">-</span></div>
+        <div class="view-state-row"><span>MATLAB Pos</span><span id="view-matlab-position">-</span></div>
+        <div class="view-state-row wide"><span>MATLAB View</span><span id="view-matlab-view">-</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel right-panel">
+    <h2>Live Diagnostic State</h2>
+    <div class="data-row"><span>Rotor Architecture</span><span>2-spool</span></div>
+    <div class="data-row"><span>N1 Spool</span><span>Fan + LPC + LPT</span></div>
+    <div class="data-row"><span>N2 Spool</span><span>HPC + HPT</span></div>
+    <div class="data-row"><span>Affected Modules</span><span id="affected-modules">None</span></div>
+    <div class="data-row"><span>N1 Relative Speed</span><span id="n1-speed">100%</span></div>
+    <div class="data-row"><span>N2 Relative Speed</span><span id="n2-speed">100%</span></div>
+    <div class="data-row"><span>N1/N2 Command</span><span id="n1n2-ratio">0.39</span></div>
+    <div class="data-row"><span>Bypass Ratio</span><span id="bypass-ratio">8.0</span></div>
+    <div class="data-row"><span>Rotor-Stator Clearance</span><span id="clearance-state">0.06</span></div>
+    <div class="data-row"><span>Combustor State</span><span id="combustor-state">Stable</span></div>
+    <div id="status">
+      <strong id="status-title">NOMINAL</strong>
+      <p id="status-desc">All rotor modules are operating in the representative baseline state.</p>
+    </div>
+  </section>
+
+  <section class="panel bottom-strip">
+    <div class="legend">
+      <div class="legend-item"><span class="swatch" style="background:#38bdf8"></span>N1 spool</div>
+      <div class="legend-item"><span class="swatch" style="background:#c084fc"></span>N2 spool</div>
+      <div class="legend-item"><span class="swatch" style="background:#f97316"></span>Combustor</div>
+      <div class="legend-item"><span class="swatch" style="background:#fb7185"></span>Failure highlight</div>
+    </div>
+  </section>
+
+  <p class="hint">Drag to orbit. Scroll to zoom. Right-drag to pan.</p>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+    const MODULE_LABELS = {
+      fan: "Fan",
+      lpc: "LPC",
+      hpc: "HPC",
+      combustor: "Combustor",
+      hpt: "HPT",
+      lpt: "LPT"
+    };
+
+    const MODE_ALIASES = {
+      nominal: "none",
+      none: "none",
+      fan: "fan",
+      hpc: "hpc",
+      "hpc+lpc": "hpc_lpc",
+      "hpc_lpc": "hpc_lpc",
+      "lpc+hpc": "hpc_lpc",
+      hpt: "hpt",
+      lpt: "lpt",
+      "hpt+lpt": "hpt_lpt",
+      "hpt_lpt": "hpt_lpt",
+      "lpt+hpt": "hpt_lpt",
+      all: "all"
+    };
+
+    const PRESET_KEY = "turbofan-embed-default-preset";
+    const ROTOR_SETTINGS = [
+      { id: "fan", label: "Fan", stages: 1, bladeMin: 8, bladeMax: 24, rootMin: 0.35, rootMax: 0.6, tipMin: 1.1, tipMax: 2.20 },
+      { id: "lpc", label: "LPC", stages: 4, bladeMin: 8, bladeMax: 36, rootMin: 0.34, rootMax: 1.0, tipMin: 0.72, tipMax: 1.15 },
+      { id: "hpc", label: "HPC", stages: 7, bladeMin: 10, bladeMax: 72, rootMin: 0.20, rootMax: 0.48, tipMin: 0.40, tipMax: 0.60 },
+      { id: "hpt", label: "HPT", stages: 2, bladeMin: 8, bladeMax: 60, rootMin: 0.15, rootMax: 0.48, tipMin: 0.40, tipMax: 0.60 },
+      { id: "lpt", label: "LPT", stages: 4, bladeMin: 8, bladeMax: 164, rootMin: 0.60, rootMax: 0.90, tipMin: 0.95, tipMax: 1.25 }
+    ];
+    const N1_ROTORS = ["fan", "lpc", "lpt"];
+    const N2_ROTORS = ["hpc", "hpt"];
+    const STAGE_SPACING = 0.18;
+    const DEFAULT_VIEW = {
+      position: [-6.55, 1.94, 11.11],
+      target: [0, 0, 0]
+    };
+    const ORTHO_VIEW_SIZE = 5.6;
+    const STRUCTURAL_SHELL_THICKNESS = 0.005;
+    const SHOW_TWIST_STATIONS = false;
+    const FAN_PITCH_TABLE = [
+      { s: 0.00, pitchDeg: 48 },
+      { s: 0.08, pitchDeg: 47 },
+      { s: 0.18, pitchDeg: 43.5 },
+      { s: 0.35, pitchDeg: 37 },
+      { s: 0.50, pitchDeg: 30 },
+      { s: 0.70, pitchDeg: 22 },
+      { s: 0.88, pitchDeg: 16.5 },
+      { s: 0.96, pitchDeg: 14.7 },
+      { s: 1.00, pitchDeg: 14 }
+    ];
+    const FAN_TWIST_SPAN_SECTIONS = 40;
+    const FAN_TWIST_PIVOT_CHORD_FRACTION = 0.18; // Twist applied about 18% of the chord length
+    const MODULE_LAYOUT = {
+      fan: { x: -2.9, stages: 1 },
+      lpc: { x: -2.0, stages: 4 },
+      hpc: { x: -0.20, stages: 7 },
+      hpt: { x: 1.55, stages: 2 },
+      lpt: { x: 2.45, stages: 4 }
+    };
+    const DISK_PROFILE_DEFAULTS = {
+      fan: { boreIR: 0.20, boreThickness: 0.40, boreOR: 0.23, rimIR: 0.38, rimThickness: 0.60, rimOR: 0.60 }, // Not keeping any web for Fan Module
+      lpc: { boreIR: 0.78, boreThickness: 0.08, boreOR: 0.80, rimIR: 0.86, rimThickness: 0.09, rimOR: 0.89 },
+      hpc: { boreIR: 0.12, boreThickness: 0.07, boreOR: 0.17, rimIR: 0.26, rimThickness: 0.07, rimOR: 0.28 },
+      hpt: { boreIR: 0.14, boreThickness: 0.08, boreOR: 0.22, rimIR: 0.38, rimThickness: 0.10, rimOR: 0.47 },
+      lpt: { boreIR: 0.70, boreThickness: 0.08, boreOR: 0.72, rimIR: 0.79, rimThickness: 0.09, rimOR: 0.81 }
+    };
+    const VISIBILITY_CONTROLS = [
+      { id: "fan", label: "Fan" },
+      { id: "lpc", label: "LPC" },
+      { id: "hpc", label: "HPC" },
+      { id: "combustor", label: "Combustor" },
+      { id: "hpt", label: "HPT" },
+      { id: "lpt", label: "LPT" },
+      { id: "inlet", label: "Inlet" },
+      { id: "fanCase", label: "Fan Case" },
+      { id: "ogvs", label: "OGVs" },
+      { id: "fanCowl", label: "Fan Cowl" },
+      { id: "thrustReverser", label: "Thrust Reverser" },
+      { id: "Exhaust", label: "Exhaust" },
+      { id: "lpcCase", label: "LPC Case" },
+      { id: "coreCase", label: "Core Case" },
+      { id: "combustorCase", label: "Combustor Case" },
+      { id: "hptCase", label: "HPT Case" },
+      { id: "lptCase", label: "LPT Case" },
+      { id: "coreCowl", label: "Core Cowl" },
+      { id: "Plug", label: "Plug" },
+      { id: "FHF", label: "Fan Hub Frame" },
+      { id: "TCF", label: "Turbine Center Frame" },
+      { id: "TRF", label: "Turbine Rear Frame" }
+    ];
+    const ORTHOGONAL_VIEWS = [
+      { id: "front", label: "Front", position: [-8.4, 0, 0], target: [0, 0, 0], up: [0, 1, 0] },
+      { id: "aft", label: "Aft", position: [8.4, 0, 0], target: [0, 0, 0], up: [0, 1, 0] },
+      { id: "side", label: "Side", position: [0, 0, 8.4], target: [0, 0, 0], up: [0, 1, 0] },
+      { id: "top", label: "Top", position: [0, 8.4, 0], target: [0, 0, 0], up: [0, 0, -1] }
+    ];
+    const DEFAULT_CONFIG = {
+      speed: 1,
+      showStats: true,
+      spinPaused: false,
+      halfSection: false,
+      n1n2Ratio: 0.30,
+      bypassRatio: 8,
+      statorOpacity: 0.15,
+      flowOpacity: {
+        streamline: 0.10,
+        core: 0.70,
+        bypass: 0.15
+      },
+      rotorStatorClearance: 0.001,
+      view: null,
+      visibility: {
+        fan: true,
+        lpc: true,
+        hpc: true,
+        combustor: false,
+        hpt: true,
+        lpt: true,
+        inlet: true,
+        fanCase: true,
+        ogvs: true,
+        lpcCase: true,
+        coreCase: true,
+        combustorCase: true,
+        hptCase: true,
+        lptCase: true,
+        coreCowl: true,
+        fanCowl: true,
+        thrustReverser: true,
+        Plug: false,
+        FHF: true,
+        TCF: true,
+        TRF: true
+      },
+      directions: {
+        fan: 1,
+        lpc: 1,
+        hpc: -1,
+        hpt: -1,
+        lpt: 1
+      },
+      blades: {
+        fan: 18,
+        lpc: 26,
+        hpc: 36,
+        hpt: 48,
+        lpt: 72
+      },
+      stageBlades: {
+        fan: [18],
+        lpc: [26, 26, 30, 34],
+        hpc: [36, 42, 48, 54, 60, 66, 72],
+        hpt: [48, 60],
+        lpt: [72, 90, 108, 126]
+      },
+      rootRadii: {
+        fan: [0.59],
+        lpc: [0.9, 0.9, 0.9, 0.9],
+        hpc: [0.29, 0.32, 0.35, 0.38, 0.42, 0.45, 0.48],
+        hpt: [0.48, 0.48],
+        lpt: [0.82, 0.84, 0.86, 0.88]
+      },
+      tipRadii: {
+        fan: [2.20],
+        lpc: [1.13, 1.09, 1.04, 1.00],
+        hpc: [0.58, 0.57, 0.56, 0.54, 0.53, 0.51, 0.50],
+        hpt: [0.59, 0.59],
+        lpt: [1.00, 1.08, 1.17, 1.25]
+      },
+      colors: {
+        fan: "#38bdf8",
+        lpc: "#38bdf8",
+        hpc: "#c084fc",
+        hpt: "#c084fc",
+        lpt: "#38bdf8"
+      }
+    };
+
+    const FAILURE_MODES = {
+      none: {
+        label: "Nominal",
+        badge: "BASE",
+        title: "NOMINAL",
+        desc: "All rotor modules are operating in the representative baseline state.",
+        targets: [],
+        n1: 1.0,
+        n2: 1.0,
+        combustor: "Stable",
+        color: "#34d399",
+        bg: "rgba(16, 185, 129, 0.11)"
+      },
+      fan: {
+        label: "Fan",
+        badge: "N1",
+        title: "FAN FAILURE",
+        desc: "The Fan module is exhibiting a fault and has been flagged.",
+        targets: ["fan"],
+        n1: 0.38,
+        n2: 0.82,
+        combustor: "Compensating",
+        color: "#fb7185",
+        bg: "rgba(251, 113, 133, 0.12)"
+      },
+      hpc: {
+        label: "HPC",
+        badge: "N2",
+        title: "HPC FAILURE",
+        desc: "The high-pressure compressor is exhibiting an efficiency drop.",
+        targets: ["hpc"],
+        n1: 0.76,
+        n2: 0.32,
+        combustor: "Hot margin",
+        color: "#fb7185",
+        bg: "rgba(251, 113, 133, 0.12)"
+      },
+      hpc_lpc: {
+        label: "HPC + LPC",
+        badge: "COMP",
+        title: "COMPRESSOR SYSTEM FAILURE",
+        desc: "Both low-pressure and high-pressure compressor sections are highlighted for performance degradation.",
+        targets: ["lpc", "hpc"],
+        n1: 0.44,
+        n2: 0.28,
+        combustor: "Unstable inlet",
+        color: "#fb7185",
+        bg: "rgba(251, 113, 133, 0.12)"
+      },
+      hpt: {
+        label: "HPT",
+        badge: "N2",
+        title: "HPT FAILURE",
+        desc: "The high-pressure turbine is exhibiting an efficiency drop.",
+        targets: ["hpt"],
+        n1: 0.84,
+        n2: 0.40,
+        combustor: "High EGT",
+        color: "#fb7185",
+        bg: "rgba(251, 113, 133, 0.12)"
+      },
+      lpt: {
+        label: "LPT",
+        badge: "N1",
+        title: "LPT FAILURE",
+        desc: "The low-pressure turbine has dropped in generated power.",
+        targets: ["lpt"],
+        n1: 0.31,
+        n2: 0.78,
+        combustor: "Compensating",
+        color: "#fb7185",
+        bg: "rgba(251, 113, 133, 0.12)"
+      },
+      hpt_lpt: {
+        label: "HPT + LPT",
+        badge: "TURB",
+        title: "TURBINE SYSTEM FAILURE",
+        desc: "Both turbine sections are highlighted for performance degradation.",
+        targets: ["hpt", "lpt"],
+        n1: 0.25,
+        n2: 0.27,
+        combustor: "High EGT",
+        color: "#fb7185",
+        bg: "rgba(251, 113, 133, 0.12)"
+      },
+      all: {
+        label: "All Rotors",
+        badge: "ALL",
+        title: "GLOBAL ROTOR FAILURE",
+        desc: "All modeled rotor-bearing turbofan submodules are highlighted.",
+        targets: ["fan", "lpc", "hpc", "hpt", "lpt"],
+        n1: 0.08,
+        n2: 0.06,
+        combustor: "Offline",
+        color: "#f43f5e",
+        bg: "rgba(244, 63, 94, 0.14)"
+      }
+    };
+
+    const viewport = document.getElementById("viewport");
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x070b12);
+    scene.fog = new THREE.Fog(0x070b12, 12, 30);
+
+    const perspectiveCamera = new THREE.PerspectiveCamera(42, viewportAspectRatio(), 0.1, 100);
+    perspectiveCamera.position.set(...DEFAULT_VIEW.position);
+    const orthographicCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
+    updateOrthographicCamera();
+    let camera = perspectiveCamera;
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x070b12, 1);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    viewport.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.target.set(...DEFAULT_VIEW.target);
+    controls.minDistance = 5;
+    controls.maxDistance = 20;
+
+    const root = new THREE.Group();
+    scene.add(root);
+
+    const modules = {};
+    const visibilityTargets = {};
+    const baseMaterials = new Map();
+    let flowGroup = null;
+    let flowUniforms = null;
+    const rotating = {
+      n1: [],
+      n2: []
+    };
+    const halfSectionPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+    const engineHalfSectionPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+    const engineAxisHelperQuaternion = new THREE.Quaternion();
+    let activeView = "free";
+    let appConfig = mergeConfig(DEFAULT_CONFIG, loadSavedPreset());
+    let currentMode = "none";
+
+    const n1Color = 0x38bdf8;
+    const n2Color = 0xc084fc;
+    const highlightColor = 0xfb7185; // 0xfb7185
+
+    addLighting();
+    buildEngine();
+    buildModeButtons();
+    buildPresetControls();
+    buildSceneControls();
+    applyConfigToUI();
+    initializeExternalControl();
+    applyViewState(appConfig.view);
+    animate();
+    scheduleViewportRefresh();
+
+    window.addEventListener("resize", onResize);
+    window.setTurbofanFailureMode = setFailureMode;
+    window.setTurbofanDiagnosticsState = applyExternalState;
+
+    function updateOrthographicCamera() {
+      const aspect = viewportAspectRatio();
+      orthographicCamera.left = -ORTHO_VIEW_SIZE * aspect * 0.5;
+      orthographicCamera.right = ORTHO_VIEW_SIZE * aspect * 0.5;
+      orthographicCamera.top = ORTHO_VIEW_SIZE * 0.5;
+      orthographicCamera.bottom = -ORTHO_VIEW_SIZE * 0.5;
+      orthographicCamera.updateProjectionMatrix();
+    }
+
+    function addLighting() {
+      scene.add(new THREE.AmbientLight(0x9eb7d8, 0.55));
+
+      const key = new THREE.DirectionalLight(0xffffff, 2.4);
+      key.position.set(5, 8, 7);
+      scene.add(key);
+
+      const rim = new THREE.DirectionalLight(0x38bdf8, 1.6);
+      rim.position.set(-8, 5, -4);
+      scene.add(rim);
+
+      const warm = new THREE.PointLight(0xf97316, 1.8, 12);
+      warm.position.set(1.1, 0.1, 0.2);
+      scene.add(warm);
+    }
+
+    function buildEngine() {
+      resetEngine();
+      addReferenceAxis();
+      addNacelleAndDuct();
+      addShafts();
+      addFrames()
+
+      modules.fan = createFanModule();
+      modules.lpc = createStageModule("lpc", "LPC", colorToNumber(appConfig.colors.lpc));
+      modules.hpc = createStageModule("hpc", "HPC", colorToNumber(appConfig.colors.hpc));
+      modules.combustor = createCombustor();
+      modules.hpt = createStageModule("hpt", "HPT", colorToNumber(appConfig.colors.hpt));
+      modules.lpt = createStageModule("lpt", "LPT", colorToNumber(appConfig.colors.lpt));
+
+      addNozzle();
+      addFlowVisualization();
+      addLabels();
+      cacheBaseMaterials(root);
+      applyVisibilityState();
+      applyFlowOpacity();
+    }
+
+    function resetEngine() {
+      while (root.children.length) {
+        const child = root.children.pop();
+        disposeObject(child);
+      }
+      Object.keys(modules).forEach((key) => delete modules[key]);
+      Object.keys(visibilityTargets).forEach((key) => delete visibilityTargets[key]);
+      baseMaterials.clear();
+      flowGroup = null;
+      flowUniforms = null;
+      rotating.n1.length = 0;
+      rotating.n2.length = 0;
+    }
+
+    function disposeObject(object) {
+      object.traverse((child) => {
+        if (child.geometry) {
+          child.geometry.dispose();
+        }
+        if (child.material) {
+          const materials = Array.isArray(child.material) ? child.material : [child.material];
+          materials.forEach((material) => {
+            if (material.map) {
+              material.map.dispose();
+            }
+            material.dispose();
+          });
+        }
+      });
+    }
+
+    // Engine Centerline
+    function addReferenceAxis() {
+      const axisMat = new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.10 });
+      const axis = cylinderAlongX(10.0, 0.01, 0.01, 16, axisMat);
+      root.add(axis);
+    }
+
+    // Inlet Fan Case & Nacelle 
+    function addNacelleAndDuct() {
+      const nacelleMat = new THREE.MeshPhysicalMaterial({
+        color: 0x7c8ea4,
+        metalness: 0.28,
+        roughness: 0.55,
+        transparent: true,
+        opacity: appConfig.statorOpacity,
+        transmission: 0.22,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+
+      const bypassScale = Math.sqrt(appConfig.bypassRatio / DEFAULT_CONFIG.bypassRatio);
+      const fanCaseRadius = stageTipRadius("fan", 0) + appConfig.rotorStatorClearance;
+      const inletRadius = clampNumber(fanCaseRadius * bypassScale, 1.65, 2.75, 2.20) + appConfig.rotorStatorClearance;
+      const bypassExitRadius = fanCaseRadius * 0.80;
+      const fanX = stagePosition("fan", 0);
+      const fanCaseStart = fanX - 0.82;
+      const fanCaseEnd = fanX + 1.6 - 0.25 - 0.01; // Dist to OGV - OGV Chord Length/2 - 0.01
+      const fanCaseLength = fanCaseEnd - fanCaseStart;
+      const OGVCaseEnd = fanCaseEnd + 0.01 + 0.5 + 0.01; // Dist to OGV + OGV Chord Length + padding
+
+      // Inlet
+      const inletLength = 1.25;
+      const inletStart = fanCaseStart - inletLength;
+      const inlet = createLathedX([
+        { x: fanCaseStart, r: inletRadius },
+        { x: inletStart + 0.43, r: inletRadius },
+        { x: inletStart + 0.22, r: inletRadius + 0.01 },
+        { x: inletStart + 0.06, r: inletRadius + 0.07 },
+        { x: inletStart, r: inletRadius + 0.18 },
+        { x: inletStart + 0.06, r: inletRadius + 0.30 },
+        { x: inletStart + 0.22, r: inletRadius + 0.39 },
+        { x: inletStart + 0.43, r: inletRadius + 0.44 },
+        { x: fanCaseStart, r: inletRadius + 0.45 }], nacelleMat, 80);
+      inlet.name = "Inlet";
+      markStator(inlet);
+      root.add(inlet);
+      registerVisibilityTarget("inlet", inlet);
+
+      // Fan Case
+      const fanCase = thickCylinderAlongX(fanCaseEnd - fanCaseStart, fanCaseRadius, fanCaseRadius, 80, nacelleMat);
+      fanCase.position.x = (fanCaseStart + fanCaseEnd) / 2;
+      fanCase.name = "Fan Case";
+      markStator(fanCase);
+      root.add(fanCase);
+      registerVisibilityTarget("fanCase", fanCase);
+
+      // OGV Case
+      const ogvX = fanX + 1.60;
+      const OGVCase = thickCylinderAlongX(OGVCaseEnd - fanCaseEnd, fanCaseRadius, fanCaseRadius, 80, nacelleMat);
+      OGVCase.position.x = (fanCaseEnd + OGVCaseEnd) / 2;
+      OGVCase.name = "OGV Case";
+      markStator(OGVCase);
+      root.add(OGVCase);
+      registerVisibilityTarget("ogvs", OGVCase);
+
+      const OGVInnerRadius = stageRootRadius("fan", 0) * 2.12;
+      const OGVInnerCase = thickCylinderAlongX(OGVCaseEnd - fanCaseEnd, OGVInnerRadius, 1.40, 80, nacelleMat); //1.40 = OGV Root TE Radius
+      OGVInnerCase.position.x = (fanCaseEnd + OGVCaseEnd) / 2;
+      OGVInnerCase.name = "OGV Inner Case";
+      markStator(OGVInnerCase);
+      root.add(OGVInnerCase);
+      registerVisibilityTarget("ogvs", OGVInnerCase);
+
+      // Outer Cowl or Fan Cowl
+      const fanCowlStart = fanCaseStart;
+      const fanCowlEnd = OGVCaseEnd;
+      const fanCowl = thickCylinderAlongX(fanCowlEnd - fanCowlStart, inletRadius + 0.45, inletRadius + 0.45, 80, nacelleMat);
+      fanCowl.position.x = (fanCowlEnd + fanCowlStart) / 2;
+      fanCowl.name = "Fan Cowl";
+      markStator(fanCowl);
+      root.add(fanCowl);
+      registerVisibilityTarget("fanCowl", fanCowl);
+
+      // Thrust Reverser
+      const thrustReverserStart = OGVCaseEnd;
+      const thrustReverserEnd = stagePosition("lpt", 1);
+      const thrustReverser = createLathedX([
+        // { x: thrustReverserStart, r: fanCaseRadius },
+        { x: thrustReverserStart, r: inletRadius + 0.45 },
+        { x: thrustReverserStart + 1.5, r: inletRadius + 0.45 },
+        { x: thrustReverserEnd - 1.08, r: inletRadius + 0.20 },
+        { x: thrustReverserEnd - 0.5, r: inletRadius },
+        { x: thrustReverserEnd, r: bypassExitRadius },
+        { x: thrustReverserEnd - 1.08, r: bypassExitRadius + 0.30 },
+        { x: thrustReverserStart + 1.5, r: fanCaseRadius },
+        { x: thrustReverserStart, r: fanCaseRadius }], nacelleMat, 80);
+      thrustReverser.name = "Thrust Reverser";
+      markStator(thrustReverser);
+      root.add(thrustReverser);
+      registerVisibilityTarget("thrustReverser", thrustReverser);
+
+      // Exhaust Duct
+      // const bypassEnd = stagePosition("lpt", 1);
+
+      // Inner Cowl or Core Cowl
+      const innerCowlStart = OGVCaseEnd;
+      const innerCowlEnd = stagePosition("lpt", 3) + 0.5;
+      const innerCowlRadius = 1.40; // OGV Root TE Radius
+      const innerCowl = thickCylinderAlongX(innerCowlEnd - innerCowlStart, innerCowlRadius, innerCowlRadius, 80, nacelleMat);
+      innerCowl.position.x = (innerCowlEnd + innerCowlStart) / 2;
+      innerCowl.name = "Core Cowl";
+      markStator(innerCowl);
+      root.add(innerCowl);
+      registerVisibilityTarget("coreCowl", innerCowl);
+    }
+
+    // Inlet Fan Case & Nacelle 
+    function addFrames() {
+      const framesMat = new THREE.MeshPhysicalMaterial({
+        color: 0xc4cfdc,
+        metalness: 0.25,
+        roughness: 0.55,
+        transparent: true,
+        opacity: appConfig.statorOpacity,
+        transmission: 0.22,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+
+      const frames = new THREE.Group();
+      frames.name = "FHF TCF and TRF";
+
+      // Fan Hub Frame
+      const lpcPad = 0.15;
+      const hpcPad = 0.12;
+      const hptCaseSpan = casingSpan("hpt");
+      const lptCaseSpan = casingSpan("lpt");
+      const hptLast = MODULE_LAYOUT.hpt.stages - 1;
+      const lptLast = MODULE_LAYOUT.lpt.stages - 1;
+      const nozzleStart = stagePosition("lpt", lptLast) + 0.4;
+
+      const frameDefinitions = [
+        {
+          id: "FHF",
+          label: "Fan Hub Frame",
+          struts: 10,
+          outer: {
+            startX: stagePosition("lpc", 3) + lpcPad,
+            endX: stagePosition("hpc", 0) - hpcPad,
+            startRadius: stageTipRadius("lpc", 3) + appConfig.rotorStatorClearance,
+            endRadius: stageTipRadius("hpc", 0) + appConfig.rotorStatorClearance
+          },
+          inner: {
+            startX: stagePosition("lpc", 3) + lpcPad,
+            endX: stagePosition("hpc", 0) - 0.05,
+            startRadius: stageRootRadius("lpc", 3),
+            endRadius: stageRootRadius("hpc", 0)
+          },
+          leadingBow: -0.025,
+          trailingBow: 0.018
+        },
+        {
+          id: "TCF",
+          label: "Turbine Center Frame",
+          struts: 10,
+          outer: {
+            startX: hptCaseSpan.end,
+            endX: lptCaseSpan.start,
+            startRadius: stageTipRadius("hpt", hptLast) + appConfig.rotorStatorClearance,
+            endRadius: stageTipRadius("lpt", 0) + appConfig.rotorStatorClearance
+          },
+          inner: {
+            startX: stagePosition("hpt", hptLast) + hpcPad,
+            endX: stagePosition("lpt", 0) - 0.05,
+            startRadius: stageRootRadius("hpt", hptLast),
+            endRadius: stageRootRadius("lpt", 0)
+          },
+          leadingBow: -0.018,
+          trailingBow: 0.014
+        },
+        {
+          id: "TRF",
+          label: "Turbine Rear Frame",
+          struts: 16,
+          outer: {
+            startX: lptCaseSpan.end,
+            endX: nozzleStart,
+            startRadius: stageTipRadius("lpt", lptLast) + appConfig.rotorStatorClearance,
+            endRadius: stageTipRadius("lpt", lptLast) + appConfig.rotorStatorClearance
+          },
+          inner: {
+            startX: stagePosition("lpt", lptLast) + 0.05,
+            endX: nozzleStart,
+            startRadius: stageRootRadius("lpt", lptLast),
+            endRadius: 1.05
+          },
+          leadingBow: -0.014,
+          trailingBow: 0.010
+        }
+      ];
+
+      frameDefinitions.forEach((definition) => {
+        addStructuralFrame(frames, definition, framesMat);
+      });
+
+      root.add(frames);
+
+      return frames;
+    }
+
+    function addFlowVisualization() {
+      flowGroup = new THREE.Group();
+      flowGroup.name = "VAAYU bounded flow visualization";
+
+      const profiles = createFlowBoundaryProfiles();
+      const coreMaterial = createFlowVolumeMaterial("core", appConfig.flowOpacity.core);
+      const bypassMaterial = createFlowVolumeMaterial("bypass", appConfig.flowOpacity.bypass);
+      const combustorMaterial = createCombustorGlowMaterial(appConfig.flowOpacity.core);
+      const combustorSwirlMaterial = createCombustorSwirlMaterial(appConfig.flowOpacity.core);
+      const filamentMaterial = createFlowFilamentMaterial(appConfig.flowOpacity.streamline);
+
+      const coreFlow = new THREE.Mesh(createAnnularFlowGeometry(profiles.core, 96, 88), coreMaterial);
+      coreFlow.name = "Core flow volume bounded by core liners";
+      flowGroup.add(coreFlow);
+
+      const bypassFlow = new THREE.Mesh(createAnnularFlowGeometry(profiles.bypass, 84, 96), bypassMaterial);
+      bypassFlow.name = "Bypass flow volume bounded by nacelle and core cowl liners";
+      flowGroup.add(bypassFlow);
+
+      const combustorGlow = cylinderAlongX(profiles.combustor.endX - profiles.combustor.startX, profiles.combustor.radiusA, profiles.combustor.radiusB, 64, combustorMaterial, true);
+      combustorGlow.position.x = (profiles.combustor.startX + profiles.combustor.endX) * 0.5;
+      combustorGlow.name = "Procedural combustor thermal glow";
+      combustorGlow.renderOrder = 3;
+      flowGroup.add(combustorGlow);
+
+      const combustorSwirl = new THREE.LineSegments(createCombustorSwirlGeometry(profiles.combustor), combustorSwirlMaterial);
+      combustorSwirl.name = "Animated combustor swirl glow";
+      combustorSwirl.renderOrder = 4;
+      flowGroup.add(combustorSwirl);
+
+      const filamentGeometry = createFlowFilamentGeometry(profiles.core, profiles.bypass);
+      const filaments = new THREE.LineSegments(filamentGeometry, filamentMaterial);
+      filaments.name = "Batched animated stream filaments";
+      flowGroup.add(filaments);
+
+      flowUniforms = {
+        core: coreMaterial.uniforms,
+        bypass: bypassMaterial.uniforms,
+        combustor: combustorMaterial.uniforms,
+        combustorSwirl: combustorSwirlMaterial.uniforms,
+        filaments: filamentMaterial.uniforms
+      };
+
+      root.add(flowGroup);
+    }
+
+    function createFlowBoundaryProfiles() {
+      const fanX = stagePosition("fan", 0);
+      const lpcFirst = stagePosition("lpc", 0);
+      const lpcLast = stagePosition("lpc", MODULE_LAYOUT.lpc.stages - 1);
+      const hpcFirst = stagePosition("hpc", 0);
+      const hpcLast = stagePosition("hpc", MODULE_LAYOUT.hpc.stages - 1);
+      const hptFirst = stagePosition("hpt", 0);
+      const hptLast = stagePosition("hpt", MODULE_LAYOUT.hpt.stages - 1);
+      const lptFirst = stagePosition("lpt", 0);
+      const lptLast = stagePosition("lpt", MODULE_LAYOUT.lpt.stages - 1);
+      const nozzleStart = lptLast + 0.7;
+
+      const combustorStart = hpcLast + 0.10;
+      const combustorEnd = hptFirst - 0.2;
+      const hpcExitOuter = stageTipRadius("hpc", MODULE_LAYOUT.hpc.stages - 1) + appConfig.rotorStatorClearance;
+      const hpcExitInner = Math.max(0.18, stageRootRadius("hpc", MODULE_LAYOUT.hpc.stages - 1) * 0.82);
+      const combustorOuterExit = stageTipRadius("hpt", 0) + appConfig.rotorStatorClearance;
+      const combustorInnerExit = Math.max(0.18, stageRootRadius("hpt", 0) * 0.82);
+
+      const core = smoothProfile([
+        { x: fanX + 0.305, inner: stageRootRadius("fan", 0) + 0.30, outer: stageTipRadius("lpc", 0) + appConfig.rotorStatorClearance }, // Fan Blades Root TE
+        { x: lpcFirst - 0.16, inner: stageRootRadius("lpc", 0), outer: stageTipRadius("lpc", 0) + appConfig.rotorStatorClearance },  // LPC Case Split
+        { x: lpcLast + 0.14, inner: stageRootRadius("lpc", 3), outer: stageTipRadius("lpc", 3) + appConfig.rotorStatorClearance },
+        { x: hpcFirst - 0.10, inner: stageRootRadius("hpc", 0), outer: stageTipRadius("hpc", 0) + appConfig.rotorStatorClearance },
+        { x: hpcLast + 0.05, inner: hpcExitInner, outer: hpcExitOuter },
+        { x: combustorStart, inner: hpcExitInner * 0.82, outer: hpcExitOuter - 0.075 },
+        { x: combustorEnd, inner: combustorInnerExit, outer: combustorOuterExit - 0.075 },
+        { x: hptFirst - 0.08, inner: stageRootRadius("hpt", 0), outer: stageTipRadius("hpt", 0) + appConfig.rotorStatorClearance },
+        { x: hptLast + 0.12, inner: stageRootRadius("hpt", 1), outer: stageTipRadius("hpt", 1) + appConfig.rotorStatorClearance },
+        { x: lptFirst - 0.10, inner: stageRootRadius("lpt", 0), outer: stageTipRadius("lpt", 0) + appConfig.rotorStatorClearance },
+        { x: lptLast - 0.10, inner: stageRootRadius("lpt", 3), outer: stageTipRadius("lpt", 3) + appConfig.rotorStatorClearance },
+        // { x: lptLast + 0.10, inner: stageRootRadius("lpt", 3), outer: stageTipRadius("lpt", 3) + 2*appConfig.rotorStatorClearance },
+        { x: nozzleStart, inner: 0.82, outer: stageTipRadius("lpt", 3) + appConfig.rotorStatorClearance },
+        { x: nozzleStart + 1.51, inner: 0.0, outer: stageTipRadius("lpt", 3) * 0.65 }
+      ], 4);
+
+      const bypassScale = Math.sqrt(appConfig.bypassRatio / DEFAULT_CONFIG.bypassRatio);
+      const fanCaseRadius = stageTipRadius("fan", 0) + appConfig.rotorStatorClearance;
+      const inletRadius = clampNumber(fanCaseRadius * bypassScale, 1.65, 2.75, 2.20) + appConfig.rotorStatorClearance;
+      const bypassExitRadius = fanCaseRadius * 0.80;
+      const fanCaseStart = fanX - 0.82;
+      const fanCaseEnd = fanX + 1.6 - 0.25 - 0.01;
+      const inletStart = fanCaseStart - 1.25; // Inlet Length is 1.25
+      const ogvCaseEnd = fanCaseEnd + 0.01 + 0.5 + 0.01;
+      const thrustReverserEnd = stagePosition("lpt", 1);
+      const innerCowlEnd = lptLast + 0.5;
+      const ogvInnerRadius = stageRootRadius("fan", 0) * 2.12;
+      const coreCowlRadius = 1.40;
+      const lpcForwardStart = stagePosition("lpc", 0) - 0.16;
+      const lpcForwardRadius = stageTipRadius("lpc", 0) + appConfig.rotorStatorClearance;
+
+      const bypass = smoothProfile([
+        { x: inletStart, inner: 0.0, outer: fanCaseRadius },
+        { x: fanX - 1.23, inner: 0.0, outer: fanCaseRadius }, // Spinner start
+        { x: fanX - 0.305, inner: stageRootRadius("fan", 0), outer: fanCaseRadius }, // Fan Blades Root LE
+        { x: fanX + 0.305, inner: stageTipRadius("lpc", 0) + appConfig.rotorStatorClearance, outer: fanCaseRadius }, // Fan Blades Root TE
+        { x: lpcForwardStart, inner: lpcForwardRadius + 0.05, outer: fanCaseRadius }, // LPC Case Split
+        { x: fanCaseEnd, inner: ogvInnerRadius, outer: fanCaseRadius },
+        { x: ogvCaseEnd, inner: ogvInnerRadius, outer: fanCaseRadius },
+        { x: ogvCaseEnd + 1.50, inner: coreCowlRadius, outer: fanCaseRadius },
+        { x: thrustReverserEnd - 1.08, inner: coreCowlRadius, outer: bypassExitRadius + 0.30 },
+        { x: thrustReverserEnd, inner: coreCowlRadius, outer: bypassExitRadius },
+        { x: innerCowlEnd, inner: coreCowlRadius, outer: bypassExitRadius },
+        { x: innerCowlEnd + 0.55, inner: stageTipRadius("lpt", 3) - 0.1, outer: bypassExitRadius - 0.10 },
+        { x: innerCowlEnd + 1.75, inner: 0.85, outer: bypassExitRadius - 0.20 }
+      ], 4);
+
+      return {
+        core,
+        bypass,
+        combustor: {
+          startX: combustorStart,
+          endX: combustorEnd,
+          radiusA: Math.max(hpcExitInner + 0.07, hpcExitOuter * 0.78),
+          radiusB: Math.max(combustorInnerExit + 0.08, combustorOuterExit * 0.82)
+        }
+      };
+    }
+
+    function smoothProfile(points, samplesPerSegment) {
+      const sampled = [];
+      for (let segment = 0; segment < points.length - 1; segment += 1) {
+        const p0 = points[Math.max(0, segment - 1)];
+        const p1 = points[segment];
+        const p2 = points[segment + 1];
+        const p3 = points[Math.min(points.length - 1, segment + 2)];
+        for (let step = 0; step < samplesPerSegment; step += 1) {
+          const t = step / samplesPerSegment;
+          const inner = Math.max(0.02, catmullRomValue(p0.inner, p1.inner, p2.inner, p3.inner, t));
+          const outer = Math.max(inner + 0.05, catmullRomValue(p0.outer, p1.outer, p2.outer, p3.outer, t));
+          sampled.push({
+            x: catmullRomValue(p0.x, p1.x, p2.x, p3.x, t),
+            inner,
+            outer
+          });
+        }
+      }
+      sampled.push(points[points.length - 1]);
+      return sampled;
+    }
+
+    function createAnnularFlowGeometry(profile, axialSamples, radialSegments) {
+      const sampled = resampleProfile(profile, axialSamples);
+      const vertices = [];
+      const flowT = [];
+      const radialT = [];
+      const indices = [];
+      const ringStride = radialSegments + 1;
+
+      sampled.forEach((point, axialIndex) => {
+        const t = axialIndex / (sampled.length - 1);
+        for (let ring = 0; ring < 2; ring += 1) {
+          const radius = ring === 0 ? point.outer : point.inner;
+          for (let radialIndex = 0; radialIndex <= radialSegments; radialIndex += 1) {
+            const theta = radialIndex / radialSegments * Math.PI * 2;
+            vertices.push(point.x, radius * Math.cos(theta), radius * Math.sin(theta));
+            flowT.push(t);
+            radialT.push(ring);
+          }
+        }
+      });
+
+      for (let axialIndex = 0; axialIndex < sampled.length - 1; axialIndex += 1) {
+        const row = axialIndex * ringStride * 2;
+        const next = (axialIndex + 1) * ringStride * 2;
+        for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
+          const outerA = row + radialIndex;
+          const outerB = row + radialIndex + 1;
+          const outerC = next + radialIndex;
+          const outerD = next + radialIndex + 1;
+          indices.push(outerA, outerC, outerB, outerB, outerC, outerD);
+
+          const innerA = row + ringStride + radialIndex;
+          const innerB = row + ringStride + radialIndex + 1;
+          const innerC = next + ringStride + radialIndex;
+          const innerD = next + ringStride + radialIndex + 1;
+          indices.push(innerA, innerB, innerC, innerB, innerD, innerC);
+        }
+      }
+
+      addAnnularEndCap(indices, 0, ringStride, radialSegments, true);
+      addAnnularEndCap(indices, (sampled.length - 1) * ringStride * 2, ringStride, radialSegments, false);
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+      geometry.setAttribute("flowT", new THREE.Float32BufferAttribute(flowT, 1));
+      geometry.setAttribute("radialT", new THREE.Float32BufferAttribute(radialT, 1));
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+      geometry.computeBoundingSphere();
+      return geometry;
+    }
+
+    function addAnnularEndCap(indices, rowOffset, ringStride, radialSegments, reverse) {
+      for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
+        const outerA = rowOffset + radialIndex;
+        const outerB = rowOffset + radialIndex + 1;
+        const innerA = rowOffset + ringStride + radialIndex;
+        const innerB = rowOffset + ringStride + radialIndex + 1;
+        if (reverse) {
+          indices.push(outerA, outerB, innerA, outerB, innerB, innerA);
+        } else {
+          indices.push(outerA, innerA, outerB, outerB, innerA, innerB);
+        }
+      }
+    }
+
+    function resampleProfile(profile, count) {
+      const result = [];
+      const startX = profile[0].x;
+      const endX = profile[profile.length - 1].x;
+      for (let i = 0; i < count; i += 1) {
+        const t = i / (count - 1);
+        const x = THREE.MathUtils.lerp(startX, endX, t);
+        const point = profileAtX(profile, x);
+        result.push({ x, inner: point.inner, outer: point.outer });
+      }
+      return result;
+    }
+
+    function profileAtX(profile, x) {
+      if (x <= profile[0].x) {
+        return profile[0];
+      }
+      for (let i = 0; i < profile.length - 1; i += 1) {
+        const a = profile[i];
+        const b = profile[i + 1];
+        if (x <= b.x) {
+          const t = (x - a.x) / Math.max(0.0001, b.x - a.x);
+          return {
+            x,
+            inner: THREE.MathUtils.lerp(a.inner, b.inner, t),
+            outer: THREE.MathUtils.lerp(a.outer, b.outer, t)
+          };
+        }
+      }
+      return profile[profile.length - 1];
+    }
+
+    function createFlowFilamentGeometry(coreProfile, bypassProfile) {
+      const positions = [];
+      const flowT = [];
+      const phase = [];
+      const flowKind = [];
+      addFilamentSet(positions, flowT, phase, flowKind, coreProfile, 18, 5, 70, 0.10, 0.88, 0, 0);
+      addFilamentSet(positions, flowT, phase, flowKind, bypassProfile, 24, 4, 64, 0.18, 0.86, 10, 1);
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute("flowT", new THREE.Float32BufferAttribute(flowT, 1));
+      geometry.setAttribute("phase", new THREE.Float32BufferAttribute(phase, 1));
+      geometry.setAttribute("flowKind", new THREE.Float32BufferAttribute(flowKind, 1));
+      geometry.computeBoundingSphere();
+      return geometry;
+    }
+
+    function addFilamentSet(positions, flowT, phase, flowKind, profile, angleCount, radialCount, axialCount, radialMin, radialMax, phaseOffset, kind) {
+      const startX = profile[0].x;
+      const endX = profile[profile.length - 1].x;
+      for (let a = 0; a < angleCount; a += 1) {
+        const baseTheta = a / angleCount * Math.PI * 2;
+        for (let r = 0; r < radialCount; r += 1) {
+          const radiusMix = radialCount === 1 ? 0.5 : THREE.MathUtils.lerp(radialMin, radialMax, r / (radialCount - 1));
+          const filamentPhase = phaseOffset + a * 0.37 + r * 1.91;
+          let previous = null;
+          for (let i = 0; i < axialCount; i += 1) {
+            const t = i / (axialCount - 1);
+            const x = THREE.MathUtils.lerp(startX, endX, t);
+            const boundary = profileAtX(profile, x);
+            const radius = THREE.MathUtils.lerp(boundary.inner, boundary.outer, radiusMix);
+            const swirl = Math.sin(t * Math.PI * 5 + filamentPhase) * 0.035 + t * 0.72;
+            const theta = baseTheta + swirl;
+            const current = {
+              x,
+              y: radius * Math.cos(theta),
+              z: radius * Math.sin(theta),
+              t,
+              phase: filamentPhase
+            };
+            if (previous) {
+              positions.push(previous.x, previous.y, previous.z, current.x, current.y, current.z);
+              flowT.push(previous.t, current.t);
+              phase.push(previous.phase, current.phase);
+              flowKind.push(kind, kind);
+            }
+            previous = current;
+          }
+        }
+      }
+    }
+
+    function createCombustorSwirlGeometry(combustor) {
+      const positions = [];
+      const flowT = [];
+      const phase = [];
+      const turns = 2.8;
+      const strandCount = 18;
+      const axialSamples = 52;
+      const startX = combustor.startX;
+      const endX = combustor.endX;
+
+      for (let strand = 0; strand < strandCount; strand += 1) {
+        const strandPhase = strand / strandCount * Math.PI * 2;
+        let previous = null;
+        for (let i = 0; i < axialSamples; i += 1) {
+          const t = i / (axialSamples - 1);
+          const radius = THREE.MathUtils.lerp(combustor.radiusA, combustor.radiusB, t) * (0.58 + 0.20 * Math.sin(strand * 1.7));
+          const theta = strandPhase + t * turns * Math.PI * 2;
+          const current = {
+            x: THREE.MathUtils.lerp(startX, endX, t),
+            y: radius * Math.cos(theta),
+            z: radius * Math.sin(theta),
+            t,
+            phase: strandPhase
+          };
+          if (previous) {
+            positions.push(previous.x, previous.y, previous.z, current.x, current.y, current.z);
+            flowT.push(previous.t, current.t);
+            phase.push(previous.phase, current.phase);
+          }
+          previous = current;
+        }
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute("flowT", new THREE.Float32BufferAttribute(flowT, 1));
+      geometry.setAttribute("phase", new THREE.Float32BufferAttribute(phase, 1));
+      geometry.computeBoundingSphere();
+      return geometry;
+    }
+
+    function createFlowVolumeMaterial(kind, opacity) {
+      return new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        blending: THREE.NormalBlending,
+        uniforms: {
+          time: { value: 0 },
+          opacity: { value: opacity },
+          kind: { value: kind === "core" ? 0 : 1 }
+        },
+        vertexShader: `
+          attribute float flowT;
+          attribute float radialT;
+          varying float vFlowT;
+          varying float vRadialT;
+          varying vec3 vWorldPos;
+          void main() {
+            vFlowT = flowT;
+            vRadialT = radialT;
+            vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+            vWorldPos = worldPosition.xyz;
+            gl_Position = projectionMatrix * viewMatrix * worldPosition;
+          }
+        `,
+        fragmentShader: `
+          precision highp float;
+          uniform float time;
+          uniform float opacity;
+          uniform int kind;
+          varying float vFlowT;
+          varying float vRadialT;
+          varying vec3 vWorldPos;
+
+          vec3 coreColor(float t) {
+            vec3 c0 = vec3(0.13, 0.43, 1.00);
+            vec3 c1 = vec3(0.18, 0.88, 1.00);
+            vec3 c2 = vec3(0.94, 1.00, 1.00);
+            vec3 c3 = vec3(1.00, 0.48, 0.08);
+            vec3 c4 = vec3(1.00, 0.10, 0.04);
+            vec3 c5 = vec3(1.00, 0.86, 0.24);
+            vec3 c6 = vec3(1.00, 0.96, 0.62);
+            if (t < 0.25) return mix(c0, c1, smoothstep(0.00, 0.25, t));
+            if (t < 0.43) return mix(c1, c2, smoothstep(0.25, 0.43, t));
+            if (t < 0.56) return mix(c2, c3, smoothstep(0.43, 0.56, t));
+            if (t < 0.66) return mix(c3, c4, smoothstep(0.56, 0.66, t));
+            if (t < 0.82) return mix(c4, c5, smoothstep(0.66, 0.82, t));
+            return mix(c5, c6, smoothstep(0.82, 1.00, t));
+          }
+
+          vec3 bypassColor(float t) {
+            vec3 fanBlue = vec3(0.08, 0.58, 1.00);
+            vec3 lpcExitBlue = vec3(0.18, 0.88, 1.00);
+            vec3 exitBlue = vec3(0.54, 0.94, 1.00);
+            if (t < 0.42) return mix(fanBlue, lpcExitBlue, smoothstep(0.0, 0.42, t));
+            return mix(lpcExitBlue, exitBlue, smoothstep(0.42, 1.0, t));
+          }
+
+          void main() {
+            float band = sin(vFlowT * 42.0 - time * 2.7 + vWorldPos.y * 5.5 + vWorldPos.z * 2.3);
+            float fine = sin(vFlowT * 95.0 - time * 5.1 + length(vWorldPos.yz) * 12.0);
+            float density = 0.52 + 0.22 * band + 0.10 * fine;
+            float compressor = smoothstep(0.12, 0.42, vFlowT) * (1.0 - smoothstep(0.52, 0.78, vFlowT));
+            float combustor = smoothstep(0.45, 0.58, vFlowT) * (1.0 - smoothstep(0.66, 0.72, vFlowT));
+            float edgeFade = mix(0.62, 1.0, abs(vRadialT - 0.5) * 2.0);
+            float axialEndFade = smoothstep(0.0, 0.10, vFlowT) * (1.0 - smoothstep(0.90, 1.0, vFlowT));
+            float softenedEnds = mix(0.12, 1.0, axialEndFade);
+
+            vec3 color;
+            float alpha;
+            if (kind == 0) {
+              color = coreColor(vFlowT);
+              density += compressor * 0.28 + combustor * 0.32;
+              alpha = opacity * density * edgeFade * softenedEnds;
+            } else {
+              color = bypassColor(vFlowT);
+              density = 0.42 + 0.12 * band + 0.06 * fine;
+              alpha = opacity * density * edgeFade * softenedEnds;
+            }
+
+            gl_FragColor = vec4(color, clamp(alpha, 0.0, 0.78));
+          }
+        `
+      });
+    }
+
+    function createCombustorGlowMaterial(opacity) {
+      return new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        depthTest: true,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        uniforms: {
+          time: { value: 0 },
+          opacity: { value: opacity },
+          viewFade: { value: 1 }
+        },
+        vertexShader: `
+          varying vec3 vLocal;
+          void main() {
+            vLocal = position;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          precision highp float;
+          uniform float time;
+          uniform float opacity;
+          uniform float viewFade;
+          varying vec3 vLocal;
+          void main() {
+            float axial = vLocal.y + 0.5;
+            float theta = atan(vLocal.z, vLocal.x);
+            float radius = length(vLocal.xz);
+            float swirl = sin(theta * 5.0 + axial * 16.0 - time * 5.2);
+            float turbulence = sin(radius * 18.0 - time * 3.6) * sin(axial * 21.0 + time * 2.4);
+            float radialHotspot = 1.0 - smoothstep(0.18, 0.95, radius);
+            float intensity = 0.78 + 0.30 * swirl + 0.18 * turbulence + 0.34 * radialHotspot;
+            vec3 ember = vec3(1.0, 0.05, 0.01);
+            vec3 orange = vec3(1.0, 0.34, 0.02);
+            vec3 yellowWhite = vec3(1.0, 0.82, 0.28);
+            vec3 color = mix(ember, orange, smoothstep(-0.35, 0.55, swirl));
+            color = mix(color, yellowWhite, smoothstep(0.18, 0.84, axial) * 0.42);
+            gl_FragColor = vec4(color, clamp(opacity * viewFade * 1.55 * intensity, 0.0, 1.0));
+          }
+        `
+      });
+    }
+
+    function createCombustorSwirlMaterial(opacity) {
+      return new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        depthTest: true,
+        blending: THREE.AdditiveBlending,
+        uniforms: {
+          time: { value: 0 },
+          opacity: { value: opacity },
+          viewFade: { value: 1 }
+        },
+        vertexShader: `
+          attribute float flowT;
+          attribute float phase;
+          varying float vFlowT;
+          varying float vPhase;
+          void main() {
+            vFlowT = flowT;
+            vPhase = phase;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          precision highp float;
+          uniform float time;
+          uniform float opacity;
+          uniform float viewFade;
+          varying float vFlowT;
+          varying float vPhase;
+          void main() {
+            float dash = smoothstep(0.20, 0.76, sin(vFlowT * 44.0 - time * 7.5 + vPhase * 2.0) * 0.5 + 0.5);
+            float pulse = 0.82 + 0.32 * sin(time * 4.2 + vPhase);
+            vec3 color = mix(vec3(1.0, 0.06, 0.01), vec3(1.0, 0.46, 0.03), smoothstep(0.0, 0.82, vFlowT));
+            color = mix(color, vec3(1.0, 0.86, 0.22), dash * 0.22);
+            gl_FragColor = vec4(color, clamp(opacity * viewFade * dash * pulse * 1.18, 0.0, 1.0));
+          }
+        `
+      });
+    }
+
+    function createFlowFilamentMaterial(opacity) {
+      return new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        uniforms: {
+          time: { value: 0 },
+          opacity: { value: opacity }
+        },
+        vertexShader: `
+          attribute float flowT;
+          attribute float phase;
+          attribute float flowKind;
+          varying float vFlowT;
+          varying float vPhase;
+          varying float vFlowKind;
+          void main() {
+            vFlowT = flowT;
+            vPhase = phase;
+            vFlowKind = flowKind;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          precision highp float;
+          uniform float time;
+          uniform float opacity;
+          varying float vFlowT;
+          varying float vPhase;
+          varying float vFlowKind;
+
+          vec3 filamentColor(float t) {
+            vec3 cool = vec3(0.44, 0.90, 1.00);
+            vec3 whiteHot = vec3(1.00, 0.98, 0.86);
+            vec3 warm = vec3(1.00, 0.58, 0.12);
+            vec3 exhaust = vec3(1.00, 0.90, 0.42);
+            if (t < 0.42) return mix(cool, whiteHot, smoothstep(0.08, 0.42, t));
+            if (t < 0.68) return mix(whiteHot, warm, smoothstep(0.42, 0.68, t));
+            return mix(warm, exhaust, smoothstep(0.68, 1.0, t));
+          }
+
+          vec3 bypassFilamentColor(float t) {
+            vec3 lpcExitBlue = vec3(0.18, 0.88, 1.00);
+            vec3 exitBlue = vec3(0.58, 0.96, 1.00);
+            return mix(lpcExitBlue, exitBlue, smoothstep(0.35, 1.0, t));
+          }
+
+          void main() {
+            float dash = smoothstep(0.18, 0.62, sin(vFlowT * 72.0 - time * 6.0 + vPhase) * 0.5 + 0.5);
+            float fade = smoothstep(0.0, 0.04, vFlowT) * (1.0 - smoothstep(0.98, 1.0, vFlowT));
+            vec3 color = vFlowKind > 0.5 ? bypassFilamentColor(vFlowT) : filamentColor(vFlowT);
+            gl_FragColor = vec4(color, opacity * dash * fade * 0.52);
+          }
+        `
+      });
+    }
+
+    function updateFlowAnimation(timeSeconds) {
+      if (!flowUniforms) {
+        return;
+      }
+      flowUniforms.core.time.value = timeSeconds;
+      flowUniforms.bypass.time.value = timeSeconds;
+      flowUniforms.combustor.time.value = timeSeconds;
+      flowUniforms.combustorSwirl.time.value = timeSeconds;
+      flowUniforms.filaments.time.value = timeSeconds;
+
+      const viewDirection = new THREE.Vector3();
+      const engineAxis = new THREE.Vector3(1, 0, 0);
+      camera.getWorldDirection(viewDirection);
+      root.getWorldQuaternion(engineAxisHelperQuaternion);
+      engineAxis.applyQuaternion(engineAxisHelperQuaternion).normalize();
+      const axialAlignment = Math.abs(viewDirection.dot(engineAxis));
+      const combustorViewFade = 1.0 - smoothstepValue(0.62, 0.88, axialAlignment);
+      flowUniforms.combustor.viewFade.value = combustorViewFade;
+      flowUniforms.combustorSwirl.viewFade.value = combustorViewFade;
+    }
+
+    function applyFlowOpacity() {
+      if (!flowUniforms) {
+        return;
+      }
+      flowUniforms.core.opacity.value = appConfig.flowOpacity.core;
+      flowUniforms.bypass.opacity.value = appConfig.flowOpacity.bypass;
+      flowUniforms.combustor.opacity.value = appConfig.flowOpacity.core;
+      flowUniforms.combustorSwirl.opacity.value = appConfig.flowOpacity.core;
+      flowUniforms.filaments.opacity.value = appConfig.flowOpacity.streamline;
+    }
+
+    function addShafts() {
+      // HP Shaft
+      const n2Mat = moduleMaterial(appConfig.colors.hpc, 0.6, 0.25);
+
+      // HP Forward Shaft (Forward of HPC Stage1)
+      const startFwd = stagePosition("lpc", 3) + 0.15;
+      const endFwd = stagePosition("hpc", 0);
+      const radiusFwd = 0.12;
+      const n2ShaftFwd = cylinderAlongX(endFwd - startFwd, radiusFwd, radiusFwd, 32, n2Mat, true);
+      n2ShaftFwd.position.x = (startFwd + endFwd) / 2;
+      n2ShaftFwd.name = "HP Fwd Shaft";
+      root.add(n2ShaftFwd);
+      rotating.n2.push({ object: n2ShaftFwd, rotorId: "hpc" });
+
+      // HP Mid Shaft (Between HPC and HPT)
+      const startMid = stagePosition("hpc", MODULE_LAYOUT.hpc.stages - 1) + 0.05;
+      const endMid = stagePosition("hpt", 0) - 0.04;
+      const n2ShaftMid = createLathedX([
+        { x: startMid, r: stageRootRadius("hpc", MODULE_LAYOUT.hpc.stages - 1) },
+        { x: startMid + 0.25, r: 0.26 },
+        { x: startMid + 0.5, r: 0.26 },
+        { x: endMid, r: 0.14 }], n2Mat, 64);
+      n2ShaftMid.name = "HP shaft between HPC and HPT";
+      root.add(n2ShaftMid);
+      rotating.n2.push({ object: n2ShaftMid, rotorId: "hpc" });
+
+      // HP Aft Shaft (Aft of HPT)
+      const startAft = stagePosition("hpt", 1) + 0.04;
+      const endAft = stagePosition("hpt", 1) + 0.35;
+      const radiusAft = 0.14;
+      const n2ShaftAft = cylinderAlongX(endAft - startAft, radiusAft, radiusAft, 32, n2Mat, true);
+      n2ShaftAft.position.x = (startAft + endAft) / 2;
+      n2ShaftAft.name = "HP Aft Shaft";
+      root.add(n2ShaftAft);
+      rotating.n2.push({ object: n2ShaftAft, rotorId: "hpt" });
+
+      // LP Shaft
+      const n1Mat = moduleMaterial(appConfig.colors.lpc, 0.6, 0.25);
+      // LP Fwd Shaft
+      const startLPFwd = stagePosition("fan", 0) - 0.30; // starts from Fan Disk
+      const endLPFwd = stagePosition("lpc", 2) + 0.05; // ends at LPC Stage 3
+      const radiusLPFwd = 0.065;
+      const n1ShaftFwd = createLathedX([
+        { x: startLPFwd, r: 0.2 },
+        { x: startLPFwd + 0.6, r: 0.2 },
+        { x: stagePosition("lpc", 1) + 0.05, r: radiusLPFwd },
+        { x: endLPFwd, r: radiusLPFwd }], n1Mat, 64);
+      n1ShaftFwd.name = "LP Fwd Shaft";
+      root.add(n1ShaftFwd);
+      rotating.n1.push({ object: n1ShaftFwd, rotorId: "lpc" });
+
+      // LP Midshaft
+      const startLPMid = stagePosition("lpc", 1) + 0.05; // starts from LPC Stage 2
+      const endLPMid = stagePosition("lpt", 1) + 0.05; // ends at LPT Stage 2
+      const radiusLPMid = 0.06;
+      const n1ShaftMid = createLathedX([
+        { x: startLPMid, r: radiusLPMid },
+        { x: endLPMid - 0.1, r: radiusLPMid },
+        { x: endLPMid, r: 0.28 }], n1Mat, 80);
+      n1ShaftMid.name = "LP Midshaft";
+      root.add(n1ShaftMid);
+      rotating.n1.push({ object: n1ShaftMid, rotorId: "lpc" });
+      // LPT Cone
+      const n1LPTCone = createLathedX([
+        { x: endLPMid + .001, r: 0.28 },
+        { x: endLPMid + .001, r: 0.44 },
+        { x: stagePosition("lpt", 2), r: stageRootRadius("lpt", 2) }], n1Mat, 80);
+      n1LPTCone.name = "LPT Cone";
+      root.add(n1LPTCone);
+      rotating.n1.push({ object: n1LPTCone, rotorId: "lpc" });
+    }
+
+    function createFanModule() {
+      const group = new THREE.Group();
+      const rotor = new THREE.Group();
+      const rootRadius = stageRootRadius("fan", 0);
+      const tipRadius = stageTipRadius("fan", 0);
+      const fanX = stagePosition("fan", 0);
+      const lpcStage1X = stagePosition("lpc", 0);
+      const lpcFirstRoot = stageRootRadius("lpc", 0);
+      group.name = "Fan";
+      group.userData.moduleId = "fan";
+      group.userData.rotor = rotor;
+      rotor.name = "Fan rotor";
+
+      const hubMat = moduleMaterial(appConfig.colors.lpc, 0.6, 0.25); // 0x4b647e
+      // Add Spinner Cone
+      const spinner = createOgiveSpinner(fanX - 1.23, fanX - 0.305, rootRadius * 1.0, hubMat);
+      rotor.add(spinner);
+      // Add Fan Loadpath
+      const fanHub = createThickLathedX([
+        { x: fanX - 0.305, r: rootRadius },
+        { x: fanX + 0.305, r: rootRadius + 0.263 }, // Aft root radius offset
+        { x: lpcStage1X - 0.045 - 0.001, r: lpcFirstRoot }], hubMat, 64);
+      fanHub.name = "Fan-to-LPC structural hub transition";
+      rotor.add(fanHub);
+      // Add Fan Blades and Disk
+      const bladeMat = moduleMaterial(colorToNumber(appConfig.colors.fan), 0.7, 0.22);
+      addStageDiskAssembly(rotor, fanX, rootRadius, 0.38, hubMat, "fan", 0);
+      addBladeRow(rotor, fanX, rootRadius, tipRadius, stageBladeCount("fan", 0), 0.61, bladeMat, 0.60, "fan"); // Blade Width 0.61
+      registerVisibilityTarget("fan", rotor);
+
+      const framesMat = new THREE.MeshPhysicalMaterial({
+        color: 0xc4cfdc,
+        metalness: 0.25,
+        roughness: 0.75,
+        transparent: true,
+        opacity: appConfig.statorOpacity,
+        transmission: 0.22,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+
+      // Add OGVs & IGVs
+      const guideVanes = new THREE.Group();
+      guideVanes.name = "Fan OGVs and LPC IGVs";
+      const ogvX = fanX + 1.60;
+      addStatorVanes(guideVanes, ogvX, rootRadius * 2.12, tipRadius * 1.0, 40, framesMat, 0.50, -0.22);
+      addFrameStruts(guideVanes, lpcStage1X - 0.10, rootRadius * 1.525, tipRadius * 0.515, 16, 0.10, framesMat); // IGVs before LPC Stage 1
+      registerVisibilityTarget("ogvs", guideVanes);
+      group.add(guideVanes);
+
+      group.add(rotor);
+      root.add(group);
+      rotating.n1.push({ object: rotor, rotorId: "fan" });
+      return group;
+    }
+
+    function createStageModule(id, label, color) {
+      const group = new THREE.Group();
+      const rotor = new THREE.Group();
+      const layout = MODULE_LAYOUT[id];
+      const x = layout.x;
+      const stages = layout.stages;
+      group.name = label;
+      group.userData.moduleId = id;
+      group.userData.rotor = rotor;
+      rotor.name = `${label} rotor`;
+
+      const statorGroup = new THREE.Group();
+      statorGroup.name = `${label} stator case assembly`;
+      registerVisibilityTarget(caseVisibilityId(id), statorGroup);
+      group.add(statorGroup);
+      addModuleCasing(statorGroup, id);
+
+      const drumMat = moduleMaterial(color, 0.55, 0.25);
+      const bladeMat = moduleMaterial(color, 0.7, 0.22, 0.82);
+      const statorMat = new THREE.MeshStandardMaterial({
+        color: 0xc4cfdc,
+        metalness: 0.25,
+        roughness: 0.5,
+        transparent: true,
+        opacity: appConfig.statorOpacity,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        emissive: 0xc4cfdc,
+        emissiveIntensity: 0.02
+      });
+
+      const rotorHub = createRotorHub(id, drumMat);
+      if (rotorHub) {
+        rotor.add(rotorHub);
+      }
+
+      for (let i = 0; i < stages; i += 1) {
+        const stageX = stagePosition(id, i);
+        const innerRadius = stageRootRadius(id, i);
+        const outerRadius = stageTipRadius(id, i);
+        const bladeCount = stageBladeCount(id, i);
+
+        const localHubRadius = hubRadiusAt(id, stageX);
+        addStageDiskAssembly(rotor, stageX, innerRadius, localHubRadius, drumMat, id, i);
+        addBladeRow(rotor, stageX, innerRadius, outerRadius, bladeCount, 0.09, bladeMat, id.startsWith("h") ? -0.25 : 0.24, id); // chord length 0.09
+
+        if (i < stages - 1) {
+          const statorX = stageX + STAGE_SPACING * 0.48;
+          const flowpath = interpolatedFlowpath(id, i + 0.48);
+          const statorInner = flowpath.root + appConfig.rotorStatorClearance; // some gap for seals
+          const statorOuter = flowpath.tip + appConfig.rotorStatorClearance;
+          const statorChord = 0.08;
+          addStatorVanes(statorGroup, statorX, statorInner, statorOuter, Math.max(16, id.endsWith("t") ? Math.floor(bladeCount * 0.8) : Math.floor(bladeCount * 1.2)), statorMat, statorChord, id.startsWith("h") ? 0.1 : -0.08);
+        }
+      }
+
+      registerVisibilityTarget(id, rotor);
+      group.add(rotor);
+      root.add(group);
+      if (id === "lpc" || id === "lpt") {
+        rotating.n1.push({ object: rotor, rotorId: id });
+      } else {
+        rotating.n2.push({ object: rotor, rotorId: id });
+      }
+      return group;
+    }
+
+    function createRotorHub(id, material) {
+      const layout = MODULE_LAYOUT[id];
+      const pad = id === "hpc" ? 0.05 : 0.05; // Half of chord length 0.09
+      const controlPoints = [];
+      for (let i = 0; i < layout.stages; i += 1) {
+        controlPoints.push({ x: stagePosition(id, i) - 0.05, r: stageRootRadius(id, i) - 0.01 },
+          { x: stagePosition(id, i) + 0.05, r: stageRootRadius(id, i) + 0.16 * (stageTipRadius(id, i) - stageRootRadius(id, i)) - 0.01 }
+        );
+      }
+      if (controlPoints.length === 1) {
+        const only = controlPoints[0];
+        return createLathedX([
+          { x: only.x - pad, r: only.r * 1.0 },
+          { x: only.x, r: only.r },
+          { x: only.x + pad, r: only.r * 1.0 }
+        ], material, 56);
+      }
+
+      const first = controlPoints[0];
+      const last = controlPoints[controlPoints.length - 1];
+      const extended = [
+        // { x: first.x - pad, r: first.r * 0.98 },
+        ...controlPoints,
+        // { x: last.x + pad, r: last.r * 0.98 }
+      ];
+      const profile = sampleCatmullRomProfile(extended, 10);
+      const hub = createThickLathedX(profile, material, 72);
+      hub.name = `${id.toUpperCase()} spline-defined structural rotor hub`;
+      return hub;
+    }
+
+    function addModuleCasing(parent, id) {
+      const span = casingSpan(id);
+      const caseMat = statorShellMaterial(0x7d8fa5);
+      const layout = MODULE_LAYOUT[id];
+      const controlPoints = [{ x: span.start, r: stageTipRadius(id, 0) + appConfig.rotorStatorClearance }];
+      for (let i = 1; i < layout.stages; i += 1) {
+        controlPoints.push({ x: stagePosition(id, i), r: stageTipRadius(id, i) + appConfig.rotorStatorClearance });
+      }
+      controlPoints.push({ x: span.end, r: stageTipRadius(id, layout.stages - 1) + appConfig.rotorStatorClearance });
+      const caseShell = createThickLathedX(sampleCatmullRomProfile(controlPoints, 8), caseMat, 72, STRUCTURAL_SHELL_THICKNESS, 1);
+      caseShell.name = `${caseLabel(id)} stator casing`;
+      markStator(caseShell);
+      parent.add(caseShell);
+
+      if (id === "lpc") {
+        addLpcForwardCasingTransition(parent, span, caseMat);
+      }
+    }
+
+    function addLpcForwardCasingTransition(parent, span, material) {
+      const ogvLeadingEdge = ogvInnerCaseLeadingEdge();
+      const lpcForwardRadius = stageTipRadius("lpc", 0) + appConfig.rotorStatorClearance;
+      const controlPoints = [
+        { x: span.start, r: lpcForwardRadius },
+        { x: span.start + 0.1, r: lpcForwardRadius + 0.025 },
+        { x: (span.start + ogvLeadingEdge.x) * 0.5, r: (lpcForwardRadius + ogvLeadingEdge.radius) * 0.5 + 0.01 },
+        { x: ogvLeadingEdge.x - 0.10, r: ogvLeadingEdge.radius - 0.015 },
+        { x: ogvLeadingEdge.x, r: ogvLeadingEdge.radius }
+      ];
+      const transition = createThickLathedX(sampleCatmullRomProfile(controlPoints, 10), material, 72, STRUCTURAL_SHELL_THICKNESS, 1);
+      transition.name = "LPC forward casing transition to OGV inner case";
+      markStator(transition);
+      parent.add(transition);
+    }
+
+    function ogvInnerCaseLeadingEdge() {
+      const fanX = stagePosition("fan", 0);
+      return {
+        x: fanX + 1.6 - 0.25 - 0.01,
+        radius: stageRootRadius("fan", 0) * 2.12
+      };
+    }
+
+    function caseVisibilityId(rotorId) {
+      if (rotorId === "hpc") {
+        return "coreCase";
+      }
+      return `${rotorId}Case`;
+    }
+
+    function caseLabel(rotorId) {
+      if (rotorId === "hpc") {
+        return "Core Case";
+      }
+      return `${rotorId.toUpperCase()} Case`;
+    }
+
+    function createCombustor() {
+      const group = new THREE.Group();
+      group.name = "Combustor";
+      group.userData.moduleId = "combustor";
+      const combustorInternals = new THREE.Group();
+      combustorInternals.name = "Combustor internals";
+      registerVisibilityTarget("combustor", combustorInternals);
+      const hpcLast = MODULE_LAYOUT.hpc.stages - 1;
+      const combustorStart = stagePosition("hpc", hpcLast) + 0.2;
+      const combustorEnd = stagePosition("hpt", 0) - 0.2;
+      const combustorLength = combustorEnd - combustorStart;
+      const outerInletRadius = stageTipRadius("hpc", hpcLast) + appConfig.rotorStatorClearance;
+      const outerExitRadius = stageTipRadius("hpt", 0) + appConfig.rotorStatorClearance;
+      const innerInlet = Math.max(0.2, stageRootRadius("hpc", hpcLast) * 0.82);
+      const innerExit = Math.max(0.2, stageRootRadius("hpt", 0) * 0.82);
+      group.position.x = (combustorStart + combustorEnd) / 2;
+
+      const linerMat = new THREE.MeshStandardMaterial({
+        color: 0x8a4b2d,
+        metalness: 0.22,
+        roughness: 0.58,
+        transparent: true,
+        opacity: 0.55,
+        side: THREE.DoubleSide
+      });
+
+      const liner = cylinderAlongX(combustorLength, outerInletRadius - 0.05, outerExitRadius - 0.05, 56, linerMat, true);
+      combustorInternals.add(liner);
+
+      const combustorCase = thickCylinderAlongX(combustorLength + 0.16, outerInletRadius, outerExitRadius, 56, statorShellMaterial(0x9aa8b8)); //statorShellMaterial(0x9aa8b8)
+      combustorCase.name = "Combustor Case";
+      markStator(combustorCase);
+      group.add(combustorCase);
+      registerVisibilityTarget("combustorCase", combustorCase);
+
+      const lipMat = new THREE.MeshStandardMaterial({
+        color: 0xff8a3d,
+        metalness: 0.15,
+        roughness: 0.42,
+        transparent: true,
+        opacity: 0.28,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        emissive: 0xf97316,
+        emissiveIntensity: 0.04
+      });
+
+      //const inletLip = cylinderAlongX(0.035, outerInlet, outerInlet * 0.98, 48, lipMat, true);
+      //inletLip.position.x = -combustorLength / 2;
+      //const exitLip = cylinderAlongX(0.035, outerExit * 1.02, outerExit, 48, lipMat, true);
+      //exitLip.position.x = combustorLength / 2;
+      //group.add(inletLip, exitLip);
+
+      const hollowMat = new THREE.MeshBasicMaterial({
+        color: 0x090b0f,
+        transparent: true,
+        opacity: 0.36,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      }); // No Metal Definition here
+      const hollowCore = cylinderAlongX(combustorLength, innerInlet, innerExit, 40, hollowMat, true);
+      hollowCore.name = "Combustor hollow core";
+      combustorInternals.add(hollowCore);
+
+      group.add(combustorInternals);
+      root.add(group);
+      return group;
+    }
+
+    function addNozzle() {
+      const nozzleMat = new THREE.MeshStandardMaterial({
+        color: 0x708397,
+        metalness: 0.45,
+        roughness: 0.32,
+        transparent: true,
+        opacity: 0.27,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+
+      const nozzleStart = stagePosition("lpt", 3) + 0.4;
+      const nozzleLength = 1.70;
+      const nozzle = thickCylinderAlongX(nozzleLength, stageRootRadius("lpt", 3), 0.05, 80, nozzleMat);
+      nozzle.position.x = nozzleStart + nozzleLength / 2;
+      markStator(nozzle);
+      root.add(nozzle);
+      registerVisibilityTarget("Plug", nozzle);
+    }
+
+    function addLabels() {
+      const labels = [
+        ["Fan", "fan", -2.9, 2.50],
+        ["LPC", "lpc", -2.00, 1.46],
+        ["HPC", "hpc", -0.10, 0.85],
+        ["Combustor", "combustor", 0.85, 0.90],
+        ["HPT", "hpt", 1.55, 0.85],
+        ["LPT", "lpt", 2.45, 1.50]
+      ];
+
+      labels.forEach(([text, visibilityId, x, y]) => {
+        const sprite = makeTextSprite(text);
+        sprite.position.set(x, y, 0);
+        sprite.userData.moduleLabelId = visibilityId;
+        root.add(sprite);
+        registerVisibilityTarget(visibilityId, sprite);
+      });
+    }
+
+    function createOgiveSpinner(startX, endX, baseRadius, material) {
+      const points = [];
+      const samples = 18;
+      for (let i = 0; i <= samples; i += 1) {
+        const t = i / samples;
+        const x = THREE.MathUtils.lerp(startX, endX, t);
+        const eased = Math.sin(t * Math.PI * 0.5);
+        const radius = baseRadius * Math.pow(eased, 0.62) * (0.94 + 0.06 * t);
+        points.push({ x, r: radius });
+      }
+      points[0].r = 0;
+      const spinner = createLathedX(points, material, 72);
+      spinner.name = "Ogive fan spinner";
+      return spinner;
+    }
+
+    function createLathedX(profilePoints, material, radialSegments = 64) {
+      const xValues = profilePoints.map((point) => point.x);
+      const centerX = (Math.min(...xValues) + Math.max(...xValues)) / 2;
+      const lathePoints = profilePoints.map((point) => new THREE.Vector2(Math.max(0.001, point.r), centerX - point.x));
+      if (profilePoints[0].r <= 0.001) {
+        lathePoints[0].x = 0;
+      }
+      const geometry = new THREE.LatheGeometry(lathePoints, radialSegments);
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.rotation.z = Math.PI / 2;
+      mesh.position.x = centerX;
+      return mesh;
+    }
+
+    function createThickLathedX(profilePoints, material, radialSegments = 64, thickness = STRUCTURAL_SHELL_THICKNESS, radialDirection = -1) {
+      if (thickness <= 0 || profilePoints.length < 2) {
+        return createLathedX(profilePoints, material, radialSegments);
+      }
+      const offsetProfile = profilePoints
+        .slice()
+        .reverse()
+        .map((point) => ({
+          x: point.x,
+          r: Math.max(0.001, point.r + radialDirection * thickness)
+        }));
+      return createLathedX([...profilePoints, ...offsetProfile, profilePoints[0]], material, radialSegments);
+    }
+
+    function sampleCatmullRomProfile(points, samplesPerSegment) {
+      if (points.length < 2) {
+        return points.slice();
+      }
+      const sampled = [];
+      for (let segment = 0; segment < points.length - 1; segment += 1) {
+        const p0 = points[Math.max(0, segment - 1)];
+        const p1 = points[segment];
+        const p2 = points[segment + 1];
+        const p3 = points[Math.min(points.length - 1, segment + 2)];
+        for (let step = 0; step < samplesPerSegment; step += 1) {
+          const t = step / samplesPerSegment;
+          sampled.push({
+            x: catmullRomValue(p0.x, p1.x, p2.x, p3.x, t),
+            r: Math.max(0.02, catmullRomValue(p0.r, p1.r, p2.r, p3.r, t))
+          });
+        }
+      }
+      sampled.push(points[points.length - 1]);
+      return sampled;
+    }
+
+    function catmullRomValue(p0, p1, p2, p3, t) {
+      const t2 = t * t;
+      const t3 = t2 * t;
+      return 0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
+    }
+
+    function hubRadiusAt(rotorId, x) {
+      const layout = MODULE_LAYOUT[rotorId];
+      if (layout.stages === 1) {
+        return stageRootRadius(rotorId, 0);
+      }
+      const firstX = stagePosition(rotorId, 0);
+      const lastX = stagePosition(rotorId, layout.stages - 1);
+      if (x <= firstX) {
+        return stageRootRadius(rotorId, 0);
+      }
+      if (x >= lastX) {
+        return stageRootRadius(rotorId, layout.stages - 1);
+      }
+      const stageFloat = (x - firstX) / STAGE_SPACING;
+      const leftIndex = Math.floor(stageFloat);
+      const t = stageFloat - leftIndex;
+      const p0 = stageRootRadius(rotorId, Math.max(0, leftIndex - 1));
+      const p1 = stageRootRadius(rotorId, leftIndex);
+      const p2 = stageRootRadius(rotorId, Math.min(layout.stages - 1, leftIndex + 1));
+      const p3 = stageRootRadius(rotorId, Math.min(layout.stages - 1, leftIndex + 2));
+      return Math.max(0.02, catmullRomValue(p0, p1, p2, p3, t));
+    }
+
+    function interpolatedFlowpath(rotorId, stageFloat) {
+      const layout = MODULE_LAYOUT[rotorId];
+      const leftIndex = Math.max(0, Math.min(layout.stages - 1, Math.floor(stageFloat)));
+      const rightIndex = Math.max(0, Math.min(layout.stages - 1, leftIndex + 1));
+      const t = Math.max(0, Math.min(1, stageFloat - leftIndex));
+      return {
+        root: THREE.MathUtils.lerp(stageRootRadius(rotorId, leftIndex), stageRootRadius(rotorId, rightIndex), t),
+        tip: THREE.MathUtils.lerp(stageTipRadius(rotorId, leftIndex), stageTipRadius(rotorId, rightIndex), t)
+      };
+    }
+
+    function addStageDiskAssembly(parent, x, bladeRootRadius, localHubRadius, material, rotorId = "generic", stageIndex = 0, overrides = {}) {
+      const profileSpec = resolveDiskProfile(rotorId, bladeRootRadius, localHubRadius, overrides);
+      const boreHalfWidth = profileSpec.boreThickness * 0.5;
+      const webHalfWidth = profileSpec.webThickness * 0.5;
+      const rimHalfWidth = profileSpec.rimThickness * 0.5;
+
+      const profile = [
+        new THREE.Vector2(profileSpec.boreIR, -boreHalfWidth),
+        new THREE.Vector2(profileSpec.boreOR, -boreHalfWidth),
+        new THREE.Vector2(profileSpec.webIR, -webHalfWidth),
+        new THREE.Vector2(profileSpec.webOR, -webHalfWidth),
+        new THREE.Vector2(profileSpec.rimIR, -rimHalfWidth),
+        new THREE.Vector2(profileSpec.rimOR, -rimHalfWidth),
+        new THREE.Vector2(profileSpec.rimOR, rimHalfWidth),
+        new THREE.Vector2(profileSpec.rimIR, rimHalfWidth),
+        new THREE.Vector2(profileSpec.webOR, webHalfWidth),
+        new THREE.Vector2(profileSpec.webIR, webHalfWidth),
+        new THREE.Vector2(profileSpec.boreOR, boreHalfWidth),
+        new THREE.Vector2(profileSpec.boreIR, boreHalfWidth),
+        new THREE.Vector2(profileSpec.boreIR, -boreHalfWidth)
+      ];
+
+      const geom = new THREE.LatheGeometry(profile, 96);
+      const disk = new THREE.Mesh(geom, material);
+      disk.rotation.z = Math.PI / 2;
+      disk.position.x = x;
+      disk.name = `${String(rotorId).toUpperCase()} stage ${stageIndex + 1} disk`;
+      disk.userData.diskProfile = profileSpec;
+      parent.add(disk);
+    }
+
+    function resolveDiskProfile(rotorId, bladeRootRadius, localHubRadius, overrides = {}) {
+      const defaults = DISK_PROFILE_DEFAULTS[rotorId] || {
+        boreIR: Math.max(0.04, bladeRootRadius * 0.45),
+        boreThickness: 0.07,
+        boreOR: Math.max(0.07, bladeRootRadius * 0.55),
+        rimIR: bladeRootRadius * 0.90,
+        rimThickness: 0.08,
+        rimOR: bladeRootRadius * 0.985
+      };
+      const baseRoot = MODULE_LAYOUT[rotorId] ? stageRootRadius(rotorId, 0) : bladeRootRadius;
+      const scale = baseRoot > 0 ? bladeRootRadius / baseRoot : 1;
+      const valueFor = (key, fallback) => {
+        const overrideValue = Number(overrides[key]);
+        if (Number.isFinite(overrideValue)) {
+          return overrideValue;
+        }
+        const defaultValue = Number(defaults[key]);
+        return Number.isFinite(defaultValue) ? defaultValue * scale : fallback;
+      };
+
+      const rimORLimit = Math.max(0.06, bladeRootRadius * 0.995);
+      const boreIR = clampNumber(valueFor("boreIR", bladeRootRadius * 0.35), 0.02, rimORLimit - 0.08, bladeRootRadius * 0.35);
+      const boreOR = clampNumber(valueFor("boreOR", Math.max(localHubRadius * 0.55, boreIR + 0.06)), boreIR + 0.015, rimORLimit - 0.045, boreIR + 0.06);
+      const rimOR = clampNumber(valueFor("rimOR", bladeRootRadius * 0.985), boreOR + 0.045, rimORLimit, bladeRootRadius * 0.985);
+      const rimIR = clampNumber(valueFor("rimIR", rimOR - bladeRootRadius * 0.08), boreOR + 0.020, rimOR - 0.012, rimOR - 0.04);
+      const webIR = clampNumber(Number(overrides.webIR), boreOR, rimIR - 0.01, boreOR + 0.008);
+      const webOR = clampNumber(Number(overrides.webOR), webIR + 0.01, rimIR, rimIR - 0.008);
+
+      return {
+        boreIR,
+        boreOR,
+        boreThickness: clampNumber(valueFor("boreThickness", 0.07), 0.02, 0.20, 0.07),
+        webIR,
+        webOR,
+        webThickness: clampNumber(valueFor("webThickness", 0.026), 0.008, 0.08, 0.026),
+        rimIR,
+        rimOR,
+        rimThickness: clampNumber(valueFor("rimThickness", 0.08), 0.02, 0.22, 0.08)
+      };
+    }
+
+    function annularCylinderAlongX(length, innerRadius, outerRadius, radialSegments, material) {
+      const geom = new THREE.CylinderGeometry(outerRadius, outerRadius, length, radialSegments, 1, false);
+      geom.rotateZ(Math.PI / 2);
+      const mesh = new THREE.Mesh(geom, material);
+      if (innerRadius > 0) {
+        mesh.userData.innerRadius = innerRadius;
+      }
+      return mesh;
+    }
+
+    function thickCylinderAlongX(length, innerRadiusA, innerRadiusB, radialSegments, material, thickness = STRUCTURAL_SHELL_THICKNESS) {
+      const halfLength = length * 0.5;
+      return createLathedX([
+        { x: -halfLength, r: innerRadiusA },
+        { x: halfLength, r: innerRadiusB },
+        { x: halfLength, r: innerRadiusB + thickness },
+        { x: -halfLength, r: innerRadiusA + thickness },
+        { x: -halfLength, r: innerRadiusA }
+      ], material, radialSegments);
+    }
+
+    function addStructuralFrame(parent, definition, material) {
+      const frameGroup = new THREE.Group();
+      frameGroup.name = definition.label;
+
+      const outerCase = createFrameCaseShell(definition.outer, material, `${definition.label} outer case`);
+      const innerCase = createFrameCaseShell(definition.inner, material, `${definition.label} inner case`);
+      const struts = createSweptFrameStruts(definition, material);
+
+      frameGroup.add(outerCase);
+      frameGroup.add(innerCase);
+      frameGroup.add(struts);
+      markStator(frameGroup);
+      parent.add(frameGroup);
+      registerVisibilityTarget(definition.id, frameGroup);
+      return frameGroup;
+    }
+
+    function createFrameCaseShell(edge, material, name) {
+      const shell = thickCylinderAlongX(edge.endX - edge.startX, edge.startRadius, edge.endRadius, 80, material);
+      shell.position.x = (edge.startX + edge.endX) * 0.5;
+      shell.name = name;
+      return shell;
+    }
+
+    function createSweptFrameStruts(definition, material) {
+      const group = new THREE.Group();
+      group.name = `${definition.label} struts`;
+      for (let i = 0; i < definition.struts; i += 1) {
+        const angle = i / definition.struts * Math.PI * 2;
+        const strut = createSweptFrameStrutMesh(definition, material);
+        strut.rotation.x = angle;
+        strut.userData.isStator = true;
+        group.add(strut);
+      }
+      return group;
+    }
+
+    function createSweptFrameStrutMesh(definition, material) {
+      const radialInset = definition.radialInset ?? 0.018;
+      const sampleCount = definition.samples ?? 8;
+      const shape = new THREE.Shape();
+
+      const pointOnFrameEdge = (edgeName, radialT) => {
+        const inner = definition.inner;
+        const outer = definition.outer;
+        const startX = THREE.MathUtils.lerp(inner.startX, outer.startX, radialT);
+        const endX = THREE.MathUtils.lerp(inner.endX, outer.endX, radialT);
+        const startRadius = THREE.MathUtils.lerp(inner.startRadius + radialInset, outer.startRadius - radialInset, radialT);
+        const endRadius = THREE.MathUtils.lerp(inner.endRadius + radialInset, outer.endRadius - radialInset, radialT);
+        const bow = edgeName === "leading" ? definition.leadingBow ?? 0 : definition.trailingBow ?? 0;
+        return {
+          x: (edgeName === "leading" ? startX : endX) + bow * Math.sin(Math.PI * radialT),
+          r: edgeName === "leading" ? startRadius : endRadius
+        };
+      };
+
+      const innerLeading = pointOnFrameEdge("leading", 0);
+      const innerTrailing = pointOnFrameEdge("trailing", 0);
+      shape.moveTo(innerLeading.x, innerLeading.r);
+      shape.lineTo(innerTrailing.x, innerTrailing.r);
+      for (let i = 1; i <= sampleCount; i += 1) {
+        const point = pointOnFrameEdge("trailing", i / sampleCount);
+        shape.lineTo(point.x, point.r);
+      }
+      const outerLeading = pointOnFrameEdge("leading", 1);
+      shape.lineTo(outerLeading.x, outerLeading.r);
+      for (let i = sampleCount - 1; i >= 0; i -= 1) {
+        const point = pointOnFrameEdge("leading", i / sampleCount);
+        shape.lineTo(point.x, point.r);
+      }
+      shape.closePath();
+
+      const geometry = new THREE.ExtrudeGeometry(shape, {
+        depth: definition.tangentialThickness ?? 0.024,
+        bevelEnabled: true,
+        bevelThickness: 0.004,
+        bevelSize: 0.004,
+        bevelSegments: 1
+      });
+      geometry.translate(0, 0, -(definition.tangentialThickness ?? 0.024) * 0.5);
+      return new THREE.Mesh(geometry, material);
+    }
+
+    function addFrameStruts(parent, x, innerRadius, outerRadius, count, axialChord, material) {
+      for (let i = 0; i < count; i += 1) {
+        const angle = i / count * Math.PI * 2;
+        const strut = createStandardBladeMesh(innerRadius, outerRadius, axialChord, material);
+        strut.userData.isStator = true;
+        strut.scale.z = 1.8;
+        strut.position.x = x;
+        strut.rotation.x = angle;
+        strut.rotation.y = 0.0;
+        parent.add(strut);
+      }
+    }
+
+    function addBladeRow(parent, x, innerRadius, outerRadius, count, axialChord, material, pitch, rotorId = "core") {
+      for (let i = 0; i < count; i += 1) {
+        const angle = i / count * Math.PI * 2;
+        const blade = rotorId === "fan"
+          ? createFanBladeMesh(innerRadius, outerRadius, axialChord, material, { showDebug: SHOW_TWIST_STATIONS && i === 0 })
+          : createStandardBladeMesh(innerRadius, outerRadius, axialChord, material);
+        blade.position.x = x;
+        blade.rotation.x = angle;
+        if (rotorId !== "fan") {
+          blade.rotation.y = pitch;
+        }
+        parent.add(blade);
+      }
+    }
+
+    function addStatorVanes(parent, x, innerRadius, outerRadius, count, material, axialChord = 0.08, pitch = -0.08) {
+      for (let i = 0; i < count; i += 1) {
+        const angle = i / count * Math.PI * 2;
+        const stator = createStandardBladeMesh(innerRadius, outerRadius, axialChord, material);
+        stator.userData.isStator = true;
+        stator.position.x = x;
+        stator.rotation.x = angle;
+        stator.rotation.y = pitch;
+        parent.add(stator);
+      }
+    }
+
+    function markStator(object) {
+      object.userData.isStator = true;
+      object.traverse?.((child) => {
+        child.userData.isStator = true;
+      });
+    }
+
+    function statorShellMaterial(color) {
+      return new THREE.MeshStandardMaterial({
+        color,
+        metalness: 0.32,
+        roughness: 0.38,
+        transparent: true,
+        opacity: appConfig.statorOpacity,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+    }
+
+    function createFanBladeMesh(innerRadius, outerRadius, axialChord, material, options = {}) {
+      const length = outerRadius - innerRadius;
+      const controlPoints = [
+        // { x: -0.50, r: 0.00 },
+        // { x: 0.50, r: 0.16 },
+        // { x: 0.50, r: 0.98 },
+        // { x: -0.16, r: 1.00 },
+        // { x: -0.20, r: 0.875 },
+        // { x: -0.292, r: 0.75 },
+        // { x: -0.549, r: 0.625 },
+        // { x: -0.625, r: 0.50 },
+        // { x: -0.609, r: 0.375 },
+        // { x: -0.527, r: 0.25 },
+        // { x: -0.50, r: 0.125 },
+        // { x: -0.50, r: 0.00 }
+        { x: -0.50, r: 0.00 }, // Root LE        
+        { x: 0.50, r: 0.16 }, // Root TE
+        // Trailing Edge Profile
+        { x: 0.5278, r: 0.2333 },
+        { x: 0.5472, r: 0.2969 },
+        { x: 0.5472, r: 0.3675 },
+        { x: 0.5549, r: 0.4477 },
+        { x: 0.5705, r: 0.5045 },
+        { x: 0.5821, r: 0.5695 },
+        { x: 0.5860, r: 0.6221 },
+        { x: 0.5899, r: 0.6774 },
+        { x: 0.5937, r: 0.7286 },
+        { x: 0.5899, r: 0.8033 },
+        { x: 0.5821, r: 0.8490 },
+        { x: 0.5627, r: 0.9016 },
+        { x: 0.5433, r: 0.9431 },
+        { x: 0.5161, r: 0.9763 }, // Tip TE
+        { x: -0.0709, r: 1.00 },// Tip LE
+        // Leading Edge Profile
+        { x: -0.0709, r: 1.0000 },
+        { x: -0.0970, r: 0.9362 },
+        { x: -0.1556, r: 0.8756 },
+        { x: -0.2143, r: 0.8375 },
+        { x: -0.2848, r: 0.7909 },
+        { x: -0.4076, r: 0.7333 },
+        { x: -0.4946, r: 0.6882 },
+        { x: -0.5666, r: 0.6428 },
+        { x: -0.6253, r: 0.6047 },
+        { x: -0.6840, r: 0.5031 },
+        { x: -0.6840, r: 0.4358 },
+        { x: -0.6605, r: 0.3719 },
+        { x: -0.6371, r: 0.2957 },
+        { x: -0.5881, r: 0.2200 },
+        { x: -0.5458, r: 0.1536 },
+        { x: -0.5151, r: 0.0719 },
+        { x: -0.4998, r: 0.0000 },
+        { x: -0.50, r: 0.00 } // Root LE
+      ];
+      return createTwistedFanBladeMeshFromControlPoints(controlPoints, innerRadius, length, axialChord, material, {
+        pitchTable: options.pitchTable ?? FAN_PITCH_TABLE,
+        spanSections: options.spanSections ?? FAN_TWIST_SPAN_SECTIONS,
+        showDebug: options.showDebug === true
+      });
+    }
+
+    function pitchAtSpan(s, pitchTable) {
+      const table = [...pitchTable].sort((a, b) => a.s - b.s);
+      if (s <= table[0].s) {
+        return table[0].pitchDeg;
+      }
+      for (let i = 0; i < table.length - 1; i += 1) {
+        const a = table[i];
+        const b = table[i + 1];
+        if (s <= b.s) {
+          const t = (s - a.s) / (b.s - a.s);
+          const easedT = t * t * (3 - 2 * t);
+          return THREE.MathUtils.lerp(a.pitchDeg, b.pitchDeg, easedT);
+        }
+      }
+      return table[table.length - 1].pitchDeg;
+    }
+
+    function createTwistedFanBladeMeshFromControlPoints(controlPoints, innerRadius, radialLength, axialChord, material, options) {
+      const spanSections = Math.max(20, Math.min(40, Math.round(options.spanSections)));
+      const halfThickness = 0.009;
+      const positions = [];
+      const indices = [];
+      const stations = [];
+
+      function addVertex(point) {
+        positions.push(point.x, point.y, point.z);
+        return positions.length / 3 - 1;
+      }
+
+      function addQuad(a, b, c, d) {
+        indices.push(a, b, c, a, c, d);
+      }
+
+      for (let i = 0; i <= spanSections; i += 1) {
+        const s = i / spanSections;
+        const chord = fanChordLimitsAtSpan(controlPoints, s);
+        const radius = innerRadius + radialLength * s;
+        const leX = axialChord * chord.leX;
+        const teX = axialChord * chord.teX;
+        const pivotX = leX + (teX - leX) * FAN_TWIST_PIVOT_CHORD_FRACTION;
+        const pitchDeg = pitchAtSpan(s, options.pitchTable);
+        const pitchRad = THREE.MathUtils.degToRad(pitchDeg);
+        const corners = [
+          twistFanBladePoint(leX, radius, -halfThickness, pivotX, pitchRad),
+          twistFanBladePoint(leX, radius, halfThickness, pivotX, pitchRad),
+          twistFanBladePoint(teX, radius, halfThickness, pivotX, pitchRad),
+          twistFanBladePoint(teX, radius, -halfThickness, pivotX, pitchRad)
+        ];
+        stations.push({
+          s,
+          radius,
+          leX,
+          teX,
+          pivotX,
+          pitchDeg,
+          corners,
+          vertexIndices: corners.map(addVertex)
+        });
+      }
+
+      for (let i = 0; i < stations.length - 1; i += 1) {
+        const current = stations[i].vertexIndices;
+        const next = stations[i + 1].vertexIndices;
+        for (let corner = 0; corner < 4; corner += 1) {
+          addQuad(current[corner], current[(corner + 1) % 4], next[(corner + 1) % 4], next[corner]);
+        }
+      }
+      addQuad(stations[0].vertexIndices[0], stations[0].vertexIndices[1], stations[0].vertexIndices[2], stations[0].vertexIndices[3]);
+      const tip = stations[stations.length - 1].vertexIndices;
+      addQuad(tip[3], tip[2], tip[1], tip[0]);
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+      geometry.computeBoundingBox();
+      geometry.computeBoundingSphere();
+
+      const bladeMesh = new THREE.Mesh(geometry, material);
+      bladeMesh.name = "Spanwise-twisted fan blade";
+      if (!options.showDebug) {
+        return bladeMesh;
+      }
+
+      const group = new THREE.Group();
+      group.name = "Spanwise-twisted fan blade with debug stations";
+      group.add(bladeMesh);
+      group.add(createFanTwistStationDebug(stations));
+      return group;
+    }
+
+    function fanChordLimitsAtSpan(controlPoints, s) {
+      const hits = [];
+      for (let i = 0; i < controlPoints.length - 1; i += 1) {
+        const a = controlPoints[i];
+        const b = controlPoints[i + 1];
+        if (Math.abs(a.r - b.r) < 1e-6) {
+          if (Math.abs(s - a.r) < 1e-6) {
+            hits.push(a.x, b.x);
+          }
+          continue;
+        }
+        const minR = Math.min(a.r, b.r);
+        const maxR = Math.max(a.r, b.r);
+        if (s < minR - 1e-6 || s > maxR + 1e-6) {
+          continue;
+        }
+        const t = (s - a.r) / (b.r - a.r);
+        if (t >= -1e-6 && t <= 1 + 1e-6) {
+          hits.push(THREE.MathUtils.lerp(a.x, b.x, t));
+        }
+      }
+      if (hits.length < 2) {
+        throw new Error(`Cannot resolve fan blade chord at span ${s.toFixed(3)}.`);
+      }
+      return {
+        leX: Math.min(...hits),
+        teX: Math.max(...hits)
+      };
+    }
+
+    function twistFanBladePoint(x, radius, z, pivotX, pitchRad) {
+      const dx = x - pivotX;
+      const cosPitch = Math.cos(pitchRad);
+      const sinPitch = Math.sin(pitchRad);
+      return new THREE.Vector3(
+        pivotX + dx * cosPitch + z * sinPitch,
+        radius,
+        -dx * sinPitch + z * cosPitch
+      );
+    }
+
+    function createFanTwistStationDebug(stations) {
+      const group = new THREE.Group();
+      group.name = "Fan spanwise twist station debug";
+      const lineMaterial = new THREE.LineBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.82 });
+      const labelMaterial = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.72 });
+      const labelEvery = Math.max(1, Math.round((stations.length - 1) / 4));
+
+      stations.forEach((station, index) => {
+        const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+          station.corners[0],
+          station.corners[3],
+          station.corners[2],
+          station.corners[1],
+          station.corners[0]
+        ]);
+        group.add(new THREE.Line(lineGeometry, lineMaterial));
+
+        if (index % labelEvery === 0 || index === stations.length - 1) {
+          const tickStart = station.corners[2].clone();
+          const tickEnd = station.corners[2].clone().add(new THREE.Vector3(0, 0, 0.12));
+          group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([tickStart, tickEnd]), labelMaterial));
+
+          const sprite = makeTextSprite(`${Math.round(station.pitchDeg)}deg`);
+          sprite.scale.set(0.42, 0.16, 1);
+          sprite.position.copy(tickEnd).add(new THREE.Vector3(0, 0, 0.06));
+          group.add(sprite);
+        }
+      });
+
+      return group;
+    }
+
+    function createStandardBladeMesh(innerRadius, outerRadius, axialChord, material, trailingEdgeRootFactor = 0.10) {
+      const length = outerRadius - innerRadius;
+      return createBladeMeshFromControlPoints([
+        { x: -0.50, r: 0.00 },
+        { x: 0.50, r: trailingEdgeRootFactor },
+        { x: 0.50, r: 1.00 },
+        { x: -0.50, r: 1.00 },
+        { x: -0.50, r: 0.00 }
+      ], innerRadius, length, axialChord, material);
+    }
+
+    function createBladeMeshFromControlPoints(controlPoints, innerRadius, radialLength, axialChord, material) {
+      const shape = new THREE.Shape();
+      controlPoints.forEach((point, index) => {
+        const x = axialChord * point.x;
+        const r = innerRadius + radialLength * point.r;
+        if (index === 0) {
+          shape.moveTo(x, r);
+        } else {
+          shape.lineTo(x, r);
+        }
+      });
+      shape.closePath();
+      const geometry = new THREE.ExtrudeGeometry(shape, {
+        depth: 0.018,
+        bevelEnabled: true,
+        bevelThickness: 0.004,
+        bevelSize: 0.004,
+        bevelSegments: 1
+      });
+      geometry.translate(0, 0, -0.009);
+      return new THREE.Mesh(geometry, material);
+    }
+
+    function createBladeMesh(innerRadius, outerRadius, axialChord, material) {
+      return createStandardBladeMesh(innerRadius, outerRadius, axialChord, material);
+    }
+
+    function cylinderAlongX(length, radiusA, radiusB, radialSegments, material, openEnded = false, thetaStart = 0, thetaLength = Math.PI * 2) {
+      const geometry = new THREE.CylinderGeometry(radiusA, radiusB, length, radialSegments, 1, openEnded, thetaStart, thetaLength);
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.rotation.z = Math.PI / 2;
+      return mesh;
+    }
+
+    function torusAtX(x, majorRadius, tubeRadius, material) {
+      const torus = new THREE.Mesh(new THREE.TorusGeometry(majorRadius, tubeRadius, 20, 96), material);
+      torus.rotation.y = Math.PI / 2;
+      torus.position.x = x;
+      return torus;
+    }
+
+    function moduleMaterial(color, metalness = 0.55, roughness = 0.28, opacity = 1) {
+      return new THREE.MeshStandardMaterial({
+        color,
+        metalness,
+        roughness,
+        transparent: opacity < 1,
+        opacity,
+        side: THREE.DoubleSide,
+        emissive: color,
+        emissiveIntensity: 0.03
+      });
+    }
+
+    function makeTextSprite(text, highlighted = false) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 96;
+      drawTextSpriteCanvas(canvas, text, highlighted);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
+      const sprite = new THREE.Sprite(material);
+      sprite.scale.set(0.92, 0.34, 1);
+      sprite.userData.labelText = text;
+      sprite.userData.labelHighlighted = highlighted;
+      return sprite;
+    }
+
+    function drawTextSpriteCanvas(canvas, text, highlighted = false) {
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.font = "700 34px Segoe UI, Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = highlighted ? "rgba(58, 8, 16, 0.78)" : "rgba(6, 12, 22, 0.62)";
+      roundRect(ctx, 28, 22, 200, 52, 12);
+      ctx.fill();
+      ctx.strokeStyle = highlighted ? "rgba(251, 113, 133, 0.95)" : "rgba(148, 163, 184, 0.55)";
+      ctx.lineWidth = highlighted ? 2.5 : 1;
+      ctx.stroke();
+      ctx.fillStyle = highlighted ? "#ffb4bf" : "#e6f3ff";
+      ctx.shadowColor = highlighted ? "rgba(251, 113, 133, 0.85)" : "transparent";
+      ctx.shadowBlur = highlighted ? 12 : 0;
+      ctx.fillText(text, 128, 49);
+      ctx.shadowBlur = 0;
+    }
+
+    function setTextSpriteHighlight(sprite, highlighted) {
+      if (!sprite?.material?.map || sprite.userData.labelHighlighted === highlighted) {
+        return;
+      }
+      drawTextSpriteCanvas(sprite.material.map.image, sprite.userData.labelText, highlighted);
+      sprite.material.map.needsUpdate = true;
+      sprite.userData.labelHighlighted = highlighted;
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
+    function buildModeButtons() {
+      const grid = document.getElementById("mode-grid");
+      Object.entries(FAILURE_MODES).forEach(([key, mode]) => {
+        const button = document.createElement("button");
+        button.className = `mode-button${key === "none" ? " nominal" : ""}`;
+        button.type = "button";
+        button.dataset.mode = key;
+        button.innerHTML = `<span>${mode.label}</span><span class="badge">${mode.badge}</span>`;
+        button.addEventListener("click", () => setFailureMode(key));
+        grid.appendChild(button);
+      });
+    }
+
+    function buildPresetControls() {
+      const rotorControls = document.getElementById("rotor-controls");
+      rotorControls.innerHTML = `
+        <div class="control-row">
+          <label for="ratio-control">N1/N2</label>
+          <input id="ratio-control" data-global="n1n2Ratio" type="range" min="0.2" max="1.2" step="0.01">
+          <span id="ratio-value">0.39</span>
+        </div>
+        <div class="control-row">
+          <label for="bypass-control">Bypass</label>
+          <input id="bypass-control" data-global="bypassRatio" type="number" min="2" max="16" step="0.1">
+          <span>:1</span>
+        </div>
+        <div class="control-row">
+          <label for="clearance-control">Clearance</label>
+          <input id="clearance-control" data-global="rotorStatorClearance" type="number" min="0.01" max="0.3" step="0.01">
+          <span>radius</span>
+        </div>
+        <div class="control-row">
+          <label for="stator-opacity-control">Stator opacity</label>
+          <input id="stator-opacity-control" data-global="statorOpacity" type="range" min="0.02" max="0.7" step="0.01">
+          <span id="stator-opacity-value">18%</span>
+        </div>
+      `;
+
+      ROTOR_SETTINGS.forEach((rotor) => {
+        const module = document.createElement("div");
+        module.className = "module-control";
+        module.innerHTML = `
+          <div class="module-header">
+            <strong>${rotor.label}</strong>
+          <select id="dir-${rotor.id}" data-rotor="${rotor.id}" data-control="direction">
+            <option value="1">Clockwise</option>
+            <option value="-1">Anti-clockwise</option>
+          </select>
+            <input id="color-${rotor.id}" data-rotor="${rotor.id}" data-control="colorPicker" type="color">
+            <input id="color-hex-${rotor.id}" data-rotor="${rotor.id}" data-control="color" type="text" maxlength="7">
+          </div>
+          <div class="stage-row header"><span>Stg</span><span>Blades</span><span>Root</span><span>Tip</span></div>
+        `;
+        for (let stageIndex = 0; stageIndex < rotor.stages; stageIndex += 1) {
+          const row = document.createElement("div");
+          row.className = "stage-row";
+          row.innerHTML = `
+            <span>S${stageIndex + 1}</span>
+            <input id="blade-${rotor.id}-${stageIndex}" data-rotor="${rotor.id}" data-stage="${stageIndex}" data-control="stageBlades" type="number" min="${rotor.bladeMin}" max="${rotor.bladeMax}" step="1">
+            <input id="root-${rotor.id}-${stageIndex}" data-rotor="${rotor.id}" data-stage="${stageIndex}" data-control="rootRadii" type="number" min="${rotor.rootMin}" max="${rotor.rootMax}" step="0.01">
+            <input id="tip-${rotor.id}-${stageIndex}" data-rotor="${rotor.id}" data-stage="${stageIndex}" data-control="tipRadii" type="number" min="${rotor.tipMin}" max="${rotor.tipMax}" step="0.01">
+          `;
+          module.appendChild(row);
+        }
+        rotorControls.appendChild(module);
+      });
+
+      document.getElementById("speed-control").addEventListener("input", (event) => {
+        appConfig.speed = clampNumber(event.target.value, 0.2, 3, 1);
+        applyConfigToUI(false);
+      });
+
+      document.getElementById("stats-toggle").addEventListener("change", (event) => {
+        appConfig.showStats = event.target.checked;
+        applyStatsVisibility();
+      });
+
+      rotorControls.addEventListener("input", (event) => {
+        if (event.target.dataset.global === "n1n2Ratio" || event.target.dataset.global === "statorOpacity") {
+          handlePresetInput(event.target);
+        }
+      });
+
+      rotorControls.addEventListener("change", (event) => {
+        handlePresetInput(event.target);
+      });
+
+      document.getElementById("save-preset").addEventListener("click", savePreset);
+      document.getElementById("reset-preset").addEventListener("click", () => {
+        appConfig = mergeConfig(DEFAULT_CONFIG, {});
+        try {
+          localStorage.removeItem(PRESET_KEY);
+        } catch (error) {
+          // Ignore storage restrictions.
+        }
+        applyConfigToUI();
+        rebuildWithCurrentMode();
+        applyViewState(DEFAULT_VIEW);
+        showPresetNote("Preset reset to built-in defaults.");
+      });
+    }
+
+    function buildSceneControls() {
+      const visibilityList = document.getElementById("module-visibility-list");
+      visibilityList.innerHTML = "";
+      VISIBILITY_CONTROLS.forEach((item) => {
+        const label = document.createElement("label");
+        label.className = "check-row";
+        label.innerHTML = `
+          <input id="visible-${item.id}" data-visibility="${item.id}" type="checkbox">
+          <span>${item.label}</span>
+        `;
+        visibilityList.appendChild(label);
+      });
+
+      visibilityList.addEventListener("change", (event) => {
+        const id = event.target.dataset.visibility;
+        if (!id) {
+          return;
+        }
+        appConfig.visibility[id] = event.target.checked;
+        applyVisibilityState();
+      });
+
+      document.getElementById("spin-toggle").addEventListener("change", (event) => {
+        appConfig.spinPaused = event.target.checked;
+      });
+
+      document.getElementById("half-section-toggle").addEventListener("change", (event) => {
+        appConfig.halfSection = event.target.checked;
+        applyHalfSection();
+      });
+
+      document.querySelectorAll("[data-flow-opacity]").forEach((control) => {
+        control.addEventListener("input", (event) => {
+          const key = event.target.dataset.flowOpacity;
+          if (!key || appConfig.flowOpacity[key] === undefined) {
+            return;
+          }
+          appConfig.flowOpacity[key] = clampNumber(event.target.value, 0, 1, DEFAULT_CONFIG.flowOpacity[key]);
+          applyFlowOpacity();
+          updateFlowOpacityReadout();
+        });
+      });
+
+      const viewControls = document.getElementById("view-controls");
+      viewControls.innerHTML = "";
+      ORTHOGONAL_VIEWS.forEach((view) => {
+        const button = document.createElement("button");
+        button.className = "small-button view-button";
+        button.type = "button";
+        button.dataset.view = view.id;
+        button.textContent = view.label;
+        button.addEventListener("click", () => setOrthogonalView(view.id));
+        viewControls.appendChild(button);
+      });
+    }
+
+    function handlePresetInput(target) {
+      const globalKey = target.dataset.global;
+      if (globalKey) {
+        if (globalKey === "n1n2Ratio") {
+          appConfig.n1n2Ratio = clampNumber(target.value, 0.2, 1.2, DEFAULT_CONFIG.n1n2Ratio);
+          applyConfigToUI(false);
+          updateConfigurationStats();
+          return;
+        }
+        if (globalKey === "bypassRatio") {
+          appConfig.bypassRatio = clampNumber(target.value, 2, 16, DEFAULT_CONFIG.bypassRatio);
+        } else if (globalKey === "rotorStatorClearance") {
+          appConfig.rotorStatorClearance = clampNumber(target.value, 0.01, 0.3, DEFAULT_CONFIG.rotorStatorClearance);
+        } else if (globalKey === "statorOpacity") {
+          appConfig.statorOpacity = clampNumber(target.value, 0.02, 0.7, DEFAULT_CONFIG.statorOpacity);
+          applyConfigToUI(false);
+          applyStatorOpacity();
+          return;
+        }
+        applyConfigToUI(false);
+        rebuildWithCurrentMode();
+        return;
+      }
+
+      const rotorId = target.dataset.rotor;
+      if (!rotorId) {
+        return;
+      }
+
+      if (target.dataset.control === "direction") {
+        setLinkedDirection(rotorId, Number(target.value) === -1 ? -1 : 1);
+        applyConfigToUI();
+        return;
+      }
+
+      if (target.dataset.control === "color" || target.dataset.control === "colorPicker") {
+        appConfig.colors[rotorId] = normalizeHexColor(target.value, DEFAULT_CONFIG.colors[rotorId]);
+        applyConfigToUI();
+        rebuildWithCurrentMode();
+        return;
+      }
+
+      const stageIndex = Number(target.dataset.stage);
+      const spec = ROTOR_SETTINGS.find((item) => item.id === rotorId);
+      if (!Number.isInteger(stageIndex) || !spec) {
+        return;
+      }
+
+      if (target.dataset.control === "stageBlades") {
+        appConfig.stageBlades[rotorId][stageIndex] = Math.round(clampNumber(target.value, spec.bladeMin, spec.bladeMax, DEFAULT_CONFIG.blades[rotorId]));
+      } else if (target.dataset.control === "rootRadii") {
+        const tip = appConfig.tipRadii[rotorId][stageIndex];
+        appConfig.rootRadii[rotorId][stageIndex] = clampNumber(target.value, spec.rootMin, Math.min(spec.rootMax, tip - 0.08), DEFAULT_CONFIG.rootRadii[rotorId][stageIndex]);
+      } else if (target.dataset.control === "tipRadii") {
+        const root = appConfig.rootRadii[rotorId][stageIndex];
+        appConfig.tipRadii[rotorId][stageIndex] = clampNumber(target.value, Math.max(spec.tipMin, root + 0.08), spec.tipMax, DEFAULT_CONFIG.tipRadii[rotorId][stageIndex]);
+      }
+
+      applyConfigToUI();
+      rebuildWithCurrentMode();
+    }
+
+    function applyConfigToUI(updateInputs = true) {
+      if (updateInputs) {
+        document.getElementById("speed-control").value = appConfig.speed;
+        document.getElementById("stats-toggle").checked = appConfig.showStats;
+        document.getElementById("spin-toggle").checked = appConfig.spinPaused;
+        document.getElementById("half-section-toggle").checked = appConfig.halfSection;
+        document.getElementById("ratio-control").value = appConfig.n1n2Ratio;
+        document.getElementById("bypass-control").value = appConfig.bypassRatio;
+        document.getElementById("clearance-control").value = appConfig.rotorStatorClearance;
+        document.getElementById("stator-opacity-control").value = appConfig.statorOpacity;
+        document.getElementById("streamline-opacity-control").value = appConfig.flowOpacity.streamline;
+        document.getElementById("core-flow-opacity-control").value = appConfig.flowOpacity.core;
+        document.getElementById("bypass-flow-opacity-control").value = appConfig.flowOpacity.bypass;
+        VISIBILITY_CONTROLS.forEach((item) => {
+          const control = document.getElementById(`visible-${item.id}`);
+          if (control) {
+            control.checked = appConfig.visibility[item.id] !== false;
+          }
+        });
+        ROTOR_SETTINGS.forEach((rotor) => {
+          document.getElementById(`dir-${rotor.id}`).value = String(appConfig.directions[rotor.id]);
+          document.getElementById(`color-${rotor.id}`).value = appConfig.colors[rotor.id];
+          document.getElementById(`color-hex-${rotor.id}`).value = appConfig.colors[rotor.id];
+          for (let stageIndex = 0; stageIndex < rotor.stages; stageIndex += 1) {
+            document.getElementById(`blade-${rotor.id}-${stageIndex}`).value = appConfig.stageBlades[rotor.id][stageIndex];
+            document.getElementById(`root-${rotor.id}-${stageIndex}`).value = appConfig.rootRadii[rotor.id][stageIndex].toFixed(2);
+            document.getElementById(`tip-${rotor.id}-${stageIndex}`).value = appConfig.tipRadii[rotor.id][stageIndex].toFixed(2);
+          }
+        });
+      }
+      document.getElementById("speed-value").textContent = `${Number(appConfig.speed).toFixed(1)}x`;
+      document.getElementById("ratio-value").textContent = Number(appConfig.n1n2Ratio).toFixed(2);
+      document.getElementById("stator-opacity-value").textContent = `${Math.round(appConfig.statorOpacity * 100)}%`;
+      updateFlowOpacityReadout();
+      applyFlowOpacity();
+      applyStatsVisibility();
+      applyVisibilityState();
+      applyHalfSection();
+      updateConfigurationStats();
+    }
+
+    function updateFlowOpacityReadout() {
+      document.getElementById("streamline-opacity-value").textContent = `${Math.round(appConfig.flowOpacity.streamline * 100)}%`;
+      document.getElementById("core-flow-opacity-value").textContent = `${Math.round(appConfig.flowOpacity.core * 100)}%`;
+      document.getElementById("bypass-flow-opacity-value").textContent = `${Math.round(appConfig.flowOpacity.bypass * 100)}%`;
+    }
+
+    function applyStatsVisibility() {
+      const rightPanel = document.querySelector(".right-panel");
+      if (rightPanel) {
+        rightPanel.style.display = appConfig.showStats ? "" : "none";
+      }
+    }
+
+    function registerVisibilityTarget(id, object) {
+      if (!id || !object) {
+        return;
+      }
+      visibilityTargets[id] = visibilityTargets[id] || [];
+      visibilityTargets[id].push(object);
+      object.userData.visibilityId = id;
+      object.visible = appConfig.visibility?.[id] !== false;
+    }
+
+    function applyVisibilityState() {
+      VISIBILITY_CONTROLS.forEach((item) => {
+        const visible = appConfig.visibility?.[item.id] !== false;
+        const control = document.getElementById(`visible-${item.id}`);
+        if (control) {
+          control.checked = visible;
+        }
+        (visibilityTargets[item.id] || []).forEach((object) => {
+          object.visible = visible;
+        });
+      });
+    }
+
+    function applyHalfSection() {
+      const enabled = appConfig.halfSection === true;
+      root.updateMatrixWorld(true);
+      engineHalfSectionPlane.copy(halfSectionPlane).applyMatrix4(root.matrixWorld);
+      renderer.clippingPlanes = enabled ? [engineHalfSectionPlane] : [];
+    }
+
+    function rebuildWithCurrentMode() {
+      buildEngine();
+      setFailureMode(currentMode);
+      applyVisibilityState();
+    }
+
+    function applyStatorOpacity() {
+      root.traverse((child) => {
+        if (!child.isMesh || !child.userData.isStator || !child.material) {
+          return;
+        }
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        materials.forEach((mat) => {
+          mat.transparent = true;
+          mat.opacity = appConfig.statorOpacity;
+          mat.needsUpdate = true;
+        });
+        const stored = baseMaterials.get(child.uuid);
+        if (stored) {
+          stored.forEach((state) => {
+            state.opacity = appConfig.statorOpacity;
+          });
+        }
+      });
+    }
+
+    function savePreset() {
+      try {
+        syncPresetControlsFromUI();
+        appConfig.view = captureViewState();
+        localStorage.setItem(PRESET_KEY, JSON.stringify(appConfig));
+        showPresetNote("Saved default, including module visibility, flow controls, and current orientation.");
+      } catch (error) {
+        showPresetNote("Could not save preset. Browser storage is unavailable.");
+      }
+    }
+
+    function syncPresetControlsFromUI() {
+      VISIBILITY_CONTROLS.forEach((item) => {
+        const control = document.getElementById(`visible-${item.id}`);
+        if (control) {
+          appConfig.visibility[item.id] = control.checked;
+        }
+      });
+      document.querySelectorAll("[data-flow-opacity]").forEach((control) => {
+        const key = control.dataset.flowOpacity;
+        if (key && appConfig.flowOpacity[key] !== undefined) {
+          appConfig.flowOpacity[key] = clampNumber(control.value, 0, 1, DEFAULT_CONFIG.flowOpacity[key]);
+        }
+      });
+      appConfig.showStats = document.getElementById("stats-toggle")?.checked ?? appConfig.showStats;
+      appConfig.spinPaused = document.getElementById("spin-toggle")?.checked ?? appConfig.spinPaused;
+      appConfig.halfSection = document.getElementById("half-section-toggle")?.checked ?? appConfig.halfSection;
+    }
+
+    function showPresetNote(message) {
+      const note = document.getElementById("preset-note");
+      note.textContent = message;
+      window.clearTimeout(showPresetNote.timer);
+      showPresetNote.timer = window.setTimeout(() => {
+        note.textContent = "";
+      }, 3500);
+    }
+
+    function initializeExternalControl() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("embed") === "1" || params.get("embed") === "true") {
+        document.body.classList.add("embed");
+      }
+
+      if (window.__TURBOFAN_INITIAL_STATE) {
+        applyExternalState(window.__TURBOFAN_INITIAL_STATE);
+        return;
+      }
+
+      const htmlComponent = getHtmlComponent();
+      if (htmlComponent) {
+        window.htmlComponent = htmlComponent;
+        htmlComponent.addEventListener("DataChanged", () => {
+          applyExternalState(htmlComponent.Data);
+        });
+        applyExternalState(htmlComponent.Data);
+      } else {
+        const queryConfig = configFromQuery(params);
+        if (queryConfig) {
+          applyRuntimeConfig(queryConfig);
+        }
+        setFailureMode(resolveMode(params.get("mode") || "none"));
+      }
+    }
+
+    function getHtmlComponent() {
+      if (window.htmlComponent) {
+        return window.htmlComponent;
+      }
+      const componentElement = document.querySelector("html-component");
+      if (componentElement) {
+        return componentElement;
+      }
+      if (typeof HTMLComponent === "function") {
+        try {
+          return HTMLComponent();
+        } catch (error) {
+          return null;
+        }
+      }
+      return null;
+    }
+
+    function applyExternalState(data) {
+      const state = data || {};
+      if (state.embed === true || state.embed === 1 || state.embed === "1") {
+        document.body.classList.add("embed");
+      }
+      applyRuntimeConfig(state.config || state);
+      setFailureMode(resolveMode(state.mode || "none"));
+      scheduleViewportRefresh();
+    }
+
+    function resolveMode(modeKey) {
+      const normalized = String(modeKey || "none").trim().toLowerCase();
+      return MODE_ALIASES[normalized] || "none";
+    }
+
+    function configFromQuery(params) {
+      const config = {};
+      if (params.has("speed")) {
+        config.speed = params.get("speed");
+      }
+      if (params.has("n1n2_ratio")) {
+        config.n1n2Ratio = params.get("n1n2_ratio");
+      }
+      if (params.has("bypass_ratio")) {
+        config.bypassRatio = params.get("bypass_ratio");
+      }
+      if (params.has("clearance")) {
+        config.rotorStatorClearance = params.get("clearance");
+      }
+      if (params.has("stator_opacity")) {
+        config.statorOpacity = params.get("stator_opacity");
+      }
+      if (params.has("streamline_opacity") || params.has("core_flow_opacity") || params.has("bypass_flow_opacity")) {
+        config.flowOpacity = {};
+        if (params.has("streamline_opacity")) {
+          config.flowOpacity.streamline = params.get("streamline_opacity");
+        }
+        if (params.has("core_flow_opacity")) {
+          config.flowOpacity.core = params.get("core_flow_opacity");
+        }
+        if (params.has("bypass_flow_opacity")) {
+          config.flowOpacity.bypass = params.get("bypass_flow_opacity");
+        }
+      }
+      if (params.has("stats")) {
+        config.showStats = params.get("stats") !== "0" && params.get("stats") !== "false";
+      }
+      if (params.has("view")) {
+        try {
+          config.view = JSON.parse(params.get("view"));
+        } catch (error) {
+          console.warn("Ignoring invalid view query parameter.", error);
+        }
+      }
+      ROTOR_SETTINGS.forEach((rotor) => {
+        const bladeKey = `blades_${rotor.id}`;
+        const dirKey = `dir_${rotor.id}`;
+        const colorKey = `color_${rotor.id}`;
+        if (params.has(bladeKey)) {
+          config.blades = config.blades || {};
+          config.blades[rotor.id] = params.get(bladeKey);
+        }
+        if (params.has(dirKey)) {
+          config.directions = config.directions || {};
+          config.directions[rotor.id] = params.get(dirKey);
+        }
+        if (params.has(colorKey)) {
+          config.colors = config.colors || {};
+          config.colors[rotor.id] = params.get(colorKey);
+        }
+        for (let stageIndex = 0; stageIndex < rotor.stages; stageIndex += 1) {
+          const suffix = `${rotor.id}_s${stageIndex + 1}`;
+          if (params.has(`blades_${suffix}`)) {
+            config.stageBlades = config.stageBlades || {};
+            config.stageBlades[rotor.id] = config.stageBlades[rotor.id] || [];
+            config.stageBlades[rotor.id][stageIndex] = params.get(`blades_${suffix}`);
+          }
+          if (params.has(`root_${suffix}`)) {
+            config.rootRadii = config.rootRadii || {};
+            config.rootRadii[rotor.id] = config.rootRadii[rotor.id] || [];
+            config.rootRadii[rotor.id][stageIndex] = params.get(`root_${suffix}`);
+          }
+          if (params.has(`tip_${suffix}`)) {
+            config.tipRadii = config.tipRadii || {};
+            config.tipRadii[rotor.id] = config.tipRadii[rotor.id] || [];
+            config.tipRadii[rotor.id][stageIndex] = params.get(`tip_${suffix}`);
+          }
+        }
+      });
+      return Object.keys(config).length ? config : null;
+    }
+
+    function applyRuntimeConfig(config) {
+      const before = geometrySignature(appConfig);
+      appConfig = mergeConfig(appConfig, config);
+      applyConfigToUI();
+      if (geometrySignature(appConfig) !== before) {
+        rebuildWithCurrentMode();
+      }
+      if (config?.view) {
+        applyViewState(appConfig.view);
+      }
+    }
+
+    function loadSavedPreset() {
+      try {
+        const raw = localStorage.getItem(PRESET_KEY);
+        return raw ? JSON.parse(raw) : {};
+      } catch (error) {
+        return {};
+      }
+    }
+
+    function mergeConfig(base, override) {
+      const merged = {
+        speed: clampNumber(override?.speed ?? base.speed, 0.2, 3, DEFAULT_CONFIG.speed),
+        spinPaused: override?.spinPaused ?? base.spinPaused ?? DEFAULT_CONFIG.spinPaused,
+        halfSection: override?.halfSection ?? base.halfSection ?? DEFAULT_CONFIG.halfSection,
+        n1n2Ratio: clampNumber(override?.n1n2Ratio ?? base.n1n2Ratio, 0.2, 1.2, DEFAULT_CONFIG.n1n2Ratio),
+        bypassRatio: clampNumber(override?.bypassRatio ?? base.bypassRatio, 2, 16, DEFAULT_CONFIG.bypassRatio),
+        statorOpacity: clampNumber(override?.statorOpacity ?? base.statorOpacity, 0.02, 0.7, DEFAULT_CONFIG.statorOpacity),
+        flowOpacity: {
+          streamline: clampNumber(override?.flowOpacity?.streamline ?? base.flowOpacity?.streamline, 0, 1, DEFAULT_CONFIG.flowOpacity.streamline),
+          core: clampNumber(override?.flowOpacity?.core ?? base.flowOpacity?.core, 0, 1, DEFAULT_CONFIG.flowOpacity.core),
+          bypass: clampNumber(override?.flowOpacity?.bypass ?? base.flowOpacity?.bypass, 0, 1, DEFAULT_CONFIG.flowOpacity.bypass)
+        },
+        rotorStatorClearance: clampNumber(override?.rotorStatorClearance ?? base.rotorStatorClearance, 0.01, 0.3, DEFAULT_CONFIG.rotorStatorClearance),
+        showStats: override?.showStats ?? base.showStats,
+        view: sanitizeViewState(override?.view ?? base.view),
+        visibility: {},
+        directions: {},
+        blades: {},
+        stageBlades: {},
+        rootRadii: {},
+        tipRadii: {},
+        colors: {}
+      };
+
+      VISIBILITY_CONTROLS.forEach((item) => {
+        merged.visibility[item.id] = override?.visibility?.[item.id] ?? base.visibility?.[item.id] ?? true;
+      });
+
+      ROTOR_SETTINGS.forEach((rotor) => {
+        merged.colors[rotor.id] = normalizeHexColor(override?.colors?.[rotor.id] ?? base.colors?.[rotor.id], DEFAULT_CONFIG.colors[rotor.id]);
+
+        const baseBlades = base.blades?.[rotor.id] ?? DEFAULT_CONFIG.blades[rotor.id];
+        const nextBlades = override?.blades?.[rotor.id] ?? baseBlades;
+        merged.blades[rotor.id] = Math.round(clampNumber(nextBlades, rotor.bladeMin, rotor.bladeMax, DEFAULT_CONFIG.blades[rotor.id]));
+        merged.stageBlades[rotor.id] = [];
+        merged.rootRadii[rotor.id] = [];
+        merged.tipRadii[rotor.id] = [];
+
+        for (let stageIndex = 0; stageIndex < rotor.stages; stageIndex += 1) {
+          const defaultBlades = DEFAULT_CONFIG.stageBlades[rotor.id][stageIndex];
+          const stageBlades = override?.stageBlades?.[rotor.id]?.[stageIndex] ?? override?.blades?.[rotor.id] ?? base.stageBlades?.[rotor.id]?.[stageIndex] ?? nextBlades;
+          merged.stageBlades[rotor.id][stageIndex] = Math.round(clampNumber(stageBlades, rotor.bladeMin, rotor.bladeMax, defaultBlades));
+
+          const defaultRoot = DEFAULT_CONFIG.rootRadii[rotor.id][stageIndex];
+          const defaultTip = DEFAULT_CONFIG.tipRadii[rotor.id][stageIndex];
+          const tip = clampNumber(override?.tipRadii?.[rotor.id]?.[stageIndex] ?? base.tipRadii?.[rotor.id]?.[stageIndex], rotor.tipMin, rotor.tipMax, defaultTip);
+          const root = clampNumber(override?.rootRadii?.[rotor.id]?.[stageIndex] ?? base.rootRadii?.[rotor.id]?.[stageIndex], rotor.rootMin, Math.min(rotor.rootMax, tip - 0.08), defaultRoot);
+          merged.rootRadii[rotor.id][stageIndex] = root;
+          merged.tipRadii[rotor.id][stageIndex] = Math.max(tip, root + 0.08);
+        }
+      });
+
+      applyLinkedDirectionMerge(merged, base, override);
+      return merged;
+    }
+
+    function clampNumber(value, min, max, fallback) {
+      const number = Number(value);
+      if (!Number.isFinite(number)) {
+        return fallback;
+      }
+      return Math.min(max, Math.max(min, number));
+    }
+
+    function smoothstepValue(edge0, edge1, value) {
+      const t = clampNumber((value - edge0) / (edge1 - edge0), 0, 1, 0);
+      return t * t * (3 - 2 * t);
+    }
+
+    function stageBladeCount(rotorId, stageIndex) {
+      return appConfig.stageBlades?.[rotorId]?.[stageIndex] ?? DEFAULT_CONFIG.stageBlades[rotorId][stageIndex];
+    }
+
+    function stageRootRadius(rotorId, stageIndex) {
+      return appConfig.rootRadii?.[rotorId]?.[stageIndex] ?? DEFAULT_CONFIG.rootRadii[rotorId][stageIndex];
+    }
+
+    function stageTipRadius(rotorId, stageIndex) {
+      return appConfig.tipRadii?.[rotorId]?.[stageIndex] ?? DEFAULT_CONFIG.tipRadii[rotorId][stageIndex];
+    }
+
+    function stagePosition(rotorId, stageIndex) {
+      const layout = MODULE_LAYOUT[rotorId];
+      return layout.x + (stageIndex - (layout.stages - 1) / 2) * STAGE_SPACING;
+    }
+
+    function casingSpan(rotorId) {
+      const layout = MODULE_LAYOUT[rotorId];
+      const first = stagePosition(rotorId, 0);
+      const last = stagePosition(rotorId, layout.stages - 1);
+      const pad = rotorId === "lpc" ? 0.15 : 0.12;
+      return {
+        start: first - pad,
+        end: last + pad
+      };
+    }
+
+    function maxStageTipRadius(rotorId) {
+      return Math.max(...appConfig.tipRadii[rotorId]);
+    }
+
+    function setLinkedDirection(rotorId, direction) {
+      const group = N1_ROTORS.includes(rotorId) ? N1_ROTORS : N2_ROTORS;
+      group.forEach((id) => {
+        appConfig.directions[id] = direction;
+      });
+    }
+
+    function applyLinkedDirectionMerge(merged, base, override) {
+      const applyGroup = (group) => {
+        const overrideId = group.find((id) => override?.directions?.[id] !== undefined);
+        const baseId = group.find((id) => base.directions?.[id] !== undefined) || group[0];
+        const direction = Number(overrideId ? override.directions[overrideId] : base.directions?.[baseId]) === -1 ? -1 : 1;
+        group.forEach((id) => {
+          merged.directions[id] = direction;
+        });
+      };
+      applyGroup(N1_ROTORS);
+      applyGroup(N2_ROTORS);
+    }
+
+    function normalizeHexColor(value, fallback) {
+      const text = String(value || "").trim();
+      return /^#[0-9a-f]{6}$/i.test(text) ? text : fallback;
+    }
+
+    function colorToNumber(hex) {
+      return Number.parseInt(normalizeHexColor(hex, "#ffffff").slice(1), 16);
+    }
+
+    function captureViewState() {
+      return {
+        position: [camera.position.x, camera.position.y, camera.position.z].map((value) => Number(value.toFixed(4))),
+        target: [controls.target.x, controls.target.y, controls.target.z].map((value) => Number(value.toFixed(4))),
+        up: [camera.up.x, camera.up.y, camera.up.z].map((value) => Number(value.toFixed(4)))
+      };
+    }
+
+    function sanitizeViewState(view) {
+      if (!view || !Array.isArray(view.position) || !Array.isArray(view.target)) {
+        return null;
+      }
+      const position = view.position.map(Number);
+      const target = view.target.map(Number);
+      if (position.length !== 3 || target.length !== 3 || position.some((value) => !Number.isFinite(value)) || target.some((value) => !Number.isFinite(value))) {
+        return null;
+      }
+      const up = Array.isArray(view.up) ? view.up.map(Number) : [0, 1, 0];
+      if (up.length !== 3 || up.some((value) => !Number.isFinite(value))) {
+        return { position, target, up: [0, 1, 0] };
+      }
+      return { position, target, up };
+    }
+
+    function applyViewState(view) {
+      const state = sanitizeViewState(view) || DEFAULT_VIEW;
+      usePerspectiveCamera();
+      camera.up.set(...(state.up || [0, 1, 0]));
+      camera.position.set(...state.position);
+      controls.target.set(...state.target);
+      controls.update();
+      updateViewButtons("free");
+    }
+
+    function setOrthogonalView(viewId) {
+      const view = ORTHOGONAL_VIEWS.find((item) => item.id === viewId);
+      if (!view) {
+        return;
+      }
+      useOrthographicCamera();
+      camera.up.set(...view.up);
+      camera.position.set(...view.position);
+      controls.target.set(...view.target);
+      controls.update();
+      activeView = view.id;
+      appConfig.view = captureViewState();
+      updateViewButtons(view.id);
+    }
+
+    function updateViewButtons(viewId) {
+      activeView = viewId || activeView;
+      document.querySelectorAll(".view-button").forEach((button) => {
+        button.classList.toggle("active", button.dataset.view === activeView);
+      });
+    }
+
+    function updateCurrentViewReadout() {
+      const cameraEl = document.getElementById("view-camera");
+      if (!cameraEl) {
+        return;
+      }
+      const size = viewportDimensions();
+      const view = captureViewState();
+      appConfig.view = view;
+      cameraEl.textContent = arrayText(view.position);
+      document.getElementById("view-target").textContent = arrayText(view.target);
+      document.getElementById("view-up").textContent = arrayText(view.up);
+      document.getElementById("view-viewport").textContent = `${size.width} x ${size.height}`;
+      document.getElementById("view-matlab-position").textContent = `"Position", [80 80 ${size.width} ${size.height}]`;
+      document.getElementById("view-matlab-view").textContent = matlabViewText(view);
+    }
+
+    function arrayText(values) {
+      return `[${values.map((value) => Number(value).toFixed(3)).join(" ")}]`;
+    }
+
+    function matlabViewText(view) {
+      return `"View", struct("position", ${arrayText(view.position)}, "target", ${arrayText(view.target)}, "up", ${arrayText(view.up)})`;
+    }
+
+    function usePerspectiveCamera() {
+      if (camera === perspectiveCamera) {
+        return;
+      }
+      const position = camera.position.clone();
+      const up = camera.up.clone();
+      camera = perspectiveCamera;
+      camera.position.copy(position);
+      camera.up.copy(up);
+      controls.object = camera;
+      camera.aspect = viewportAspectRatio();
+      camera.updateProjectionMatrix();
+    }
+
+    function useOrthographicCamera() {
+      if (camera === orthographicCamera) {
+        return;
+      }
+      const position = camera.position.clone();
+      const up = camera.up.clone();
+      camera = orthographicCamera;
+      camera.position.copy(position);
+      camera.up.copy(up);
+      controls.object = camera;
+      updateOrthographicCamera();
+    }
+
+    function geometrySignature(config) {
+      return JSON.stringify({
+        stageBlades: config.stageBlades,
+        rootRadii: config.rootRadii,
+        tipRadii: config.tipRadii,
+        rotorStatorClearance: config.rotorStatorClearance,
+        statorOpacity: config.statorOpacity,
+        bypassRatio: config.bypassRatio,
+        colors: config.colors
+      });
+    }
+
+    function updateConfigurationStats() {
+      document.getElementById("n1n2-ratio").textContent = Number(appConfig.n1n2Ratio).toFixed(2);
+      document.getElementById("bypass-ratio").textContent = `${Number(appConfig.bypassRatio).toFixed(1)}:1`;
+      document.getElementById("clearance-state").textContent = Number(appConfig.rotorStatorClearance).toFixed(2);
+    }
+
+    function cacheBaseMaterials(object) {
+      object.traverse((child) => {
+        if (!child.isMesh || !child.material) {
+          return;
+        }
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        baseMaterials.set(child.uuid, materials.map((mat) => ({
+          color: mat.color ? mat.color.clone() : null,
+          emissive: mat.emissive ? mat.emissive.clone() : null,
+          emissiveIntensity: mat.emissiveIntensity ?? 0,
+          opacity: mat.opacity ?? 1
+        })));
+      });
+    }
+
+    function setFailureMode(modeKey) {
+      const resolvedMode = FAILURE_MODES[modeKey] ? modeKey : "none";
+      const mode = FAILURE_MODES[resolvedMode];
+      currentMode = resolvedMode;
+      document.querySelectorAll(".mode-button").forEach((button) => {
+        button.classList.toggle("active", button.dataset.mode === resolvedMode);
+      });
+
+      restoreMaterials();
+      restoreModuleLabels();
+
+      const affected = mode.targets.length ? mode.targets.map((id) => MODULE_LABELS[id]).join(", ") : "None";
+      document.getElementById("affected-modules").textContent = affected;
+      document.getElementById("n1-speed").textContent = `${Math.round(mode.n1 * 100)}%`;
+      document.getElementById("n2-speed").textContent = `${Math.round(mode.n2 * 100)}%`;
+      document.getElementById("combustor-state").textContent = mode.combustor;
+
+      const status = document.getElementById("status");
+      const statusTitle = document.getElementById("status-title");
+      statusTitle.textContent = mode.title;
+      statusTitle.style.color = mode.color;
+      document.getElementById("status-desc").textContent = mode.desc;
+      status.style.borderLeftColor = mode.color;
+      status.style.background = mode.bg;
+
+      mode.targets.forEach((moduleId) => highlightModule(moduleId));
+
+      const spoolTargets = new Set(mode.targets);
+      if (spoolTargets.has("fan") || spoolTargets.has("lpc") || spoolTargets.has("lpt")) {
+        highlightSpool("n1");
+      }
+      if (spoolTargets.has("hpc") || spoolTargets.has("hpt")) {
+        highlightSpool("n2");
+      }
+
+      rotating.n1.speedFactor = mode.n1;
+      rotating.n2.speedFactor = mode.n2;
+    }
+
+    function restoreMaterials() {
+      root.traverse((child) => {
+        if (!child.isMesh || !child.material || !baseMaterials.has(child.uuid)) {
+          return;
+        }
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        const stored = baseMaterials.get(child.uuid);
+        materials.forEach((mat, index) => {
+          const state = stored[index];
+          if (!state) {
+            return;
+          }
+          if (mat.color && state.color) {
+            mat.color.copy(state.color);
+          }
+          if (mat.emissive && state.emissive) {
+            mat.emissive.copy(state.emissive);
+            mat.emissiveIntensity = state.emissiveIntensity;
+          }
+          mat.opacity = state.opacity;
+        });
+      });
+    }
+
+    function highlightModule(moduleId) {
+      highlightModuleLabel(moduleId);
+      const group = modules[moduleId];
+      if (!group) {
+        return;
+      }
+      if (group.userData.rotor) {
+        group.userData.rotor.traverse((child) => {
+          if (!child.isMesh || !child.material) {
+            return;
+          }
+          applyHighlight(child.material, 1.0);
+        });
+        return;
+      }
+
+      group.traverse((child) => {
+        if (!child.isMesh || !child.material) {
+          return;
+        }
+        if (child.userData.isStator) {
+          return;
+        }
+        applyHighlight(child.material, 1.0);
+      });
+    }
+
+    function restoreModuleLabels() {
+      root.traverse((child) => {
+        if (child.isSprite && child.userData.moduleLabelId) {
+          setTextSpriteHighlight(child, false);
+        }
+      });
+    }
+
+    function highlightModuleLabel(moduleId) {
+      root.traverse((child) => {
+        if (child.isSprite && child.userData.moduleLabelId === moduleId) {
+          setTextSpriteHighlight(child, true);
+        }
+      });
+    }
+
+    function highlightSpool(spoolId) {
+      root.traverse((child) => {
+        if (child.isMesh && child.userData.moduleId === spoolId) {
+          applyHighlight(child.material, 0.7);
+        }
+      });
+    }
+
+    function applyHighlight(material, intensity) {
+      const materials = Array.isArray(material) ? material : [material];
+      materials.forEach((mat) => {
+        if (mat.color) {
+          mat.color.setHex(highlightColor);
+        }
+        if (mat.emissive) {
+          mat.emissive.setHex(highlightColor);
+          mat.emissiveIntensity = intensity;
+        }
+        if (mat.transparent) {
+          mat.opacity = Math.max(mat.opacity, 0.72);
+        }
+      });
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      resizeRendererToViewport();
+      const n2Step = 0.046 * (rotating.n2.speedFactor ?? 1);
+      const n1Step = 0.046 * appConfig.n1n2Ratio * (rotating.n1.speedFactor ?? 1);
+
+      if (!appConfig.spinPaused) {
+        rotating.n1.forEach((item) => {
+          item.object.rotation.x += n1Step * directionFor(item.rotorId) * appConfig.speed;
+        });
+        rotating.n2.forEach((item) => {
+          item.object.rotation.x += n2Step * directionFor(item.rotorId) * appConfig.speed;
+        });
+      }
+
+      updateFlowAnimation(performance.now() * 0.001 * appConfig.speed);
+      controls.update();
+      updateCurrentViewReadout();
+      renderer.render(scene, camera);
+    }
+
+    function directionFor(rotorId) {
+      return appConfig.directions[rotorId] || 1;
+    }
+
+    function onResize() {
+      resizeRendererToViewport(true);
+    }
+
+    function viewportDimensions() {
+      const rect = viewport.getBoundingClientRect();
+      return {
+        width: Math.max(1, Math.floor(rect.width || viewport.clientWidth || window.innerWidth || 1)),
+        height: Math.max(1, Math.floor(rect.height || viewport.clientHeight || window.innerHeight || 1))
+      };
+    }
+
+    function viewportAspectRatio() {
+      const size = viewportDimensions();
+      return size.width / size.height || 1;
+    }
+
+    function resizeRendererToViewport(force = false) {
+      const size = viewportDimensions();
+      const canvas = renderer.domElement;
+      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+      renderer.setPixelRatio(pixelRatio);
+      const targetWidth = Math.floor(size.width * pixelRatio);
+      const targetHeight = Math.floor(size.height * pixelRatio);
+      if (force || canvas.width !== targetWidth || canvas.height !== targetHeight) {
+        renderer.setSize(size.width, size.height, true);
+      }
+      perspectiveCamera.aspect = size.width / size.height || 1;
+      perspectiveCamera.updateProjectionMatrix();
+      updateOrthographicCamera();
+    }
+
+    function scheduleViewportRefresh() {
+      [0, 50, 150, 350, 800, 1400].forEach((delay) => {
+        window.setTimeout(() => {
+          resizeRendererToViewport(true);
+          controls.update();
+          renderer.render(scene, camera);
+        }, delay);
+      });
+    }
+  </script>
+</body>
+
+</html>
